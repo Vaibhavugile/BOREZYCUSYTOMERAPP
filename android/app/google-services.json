@@ -1,0 +1,127 @@
+{
+  "project_info": {
+    "project_number": "914352196749",
+    "firebase_url": "https://renting-wala-27d06-default-rtdb.firebaseio.com",
+    "project_id": "renting-wala-27d06",
+    "storage_bucket": "renting-wala-27d06.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:914352196749:android:efea833562d1e6bff866c4",
+        "android_client_info": {
+          "package_name": "com.borezy.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "914352196749-9bokch2ekh86dd9fkdrigmv076vvo7pi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCQduY28OYEnsvlmPVEakcufVeH8KBDBOQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "914352196749-9bokch2ekh86dd9fkdrigmv076vvo7pi.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "914352196749-88vvtq7k7cbj1v7qlpunhnt52ct8h65l.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.borezyCustomerApp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:914352196749:android:d43872ac4b8dc74ef866c4",
+        "android_client_info": {
+          "package_name": "com.borezy.customerapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "914352196749-9bokch2ekh86dd9fkdrigmv076vvo7pi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCQduY28OYEnsvlmPVEakcufVeH8KBDBOQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "914352196749-9bokch2ekh86dd9fkdrigmv076vvo7pi.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "914352196749-88vvtq7k7cbj1v7qlpunhnt52ct8h65l.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.borezyCustomerApp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:914352196749:android:ee37314f98f2d15af866c4",
+        "android_client_info": {
+          "package_name": "com.example.borezy"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "914352196749-nei2cc80dhoubgp8qjdj3at434k3sbh7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.borezy",
+            "certificate_hash": "dd86ce9e2973a78c09910da8d2678270e0a8caeb"
+          }
+        },
+        {
+          "client_id": "914352196749-9bokch2ekh86dd9fkdrigmv076vvo7pi.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCQduY28OYEnsvlmPVEakcufVeH8KBDBOQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "914352196749-9bokch2ekh86dd9fkdrigmv076vvo7pi.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "914352196749-88vvtq7k7cbj1v7qlpunhnt52ct8h65l.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.borezyCustomerApp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>914352196749-tmbjr50irfcr132qd008q0pmns5k1fuk.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.914352196749-tmbjr50irfcr132qd008q0pmns5k1fuk</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>914352196749-nei2cc80dhoubgp8qjdj3at434k3sbh7.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyDP32imn2GeQfLqyUsgECsiAJ5VIbx4GTc</string>
+	<key>GCM_SENDER_ID</key>
+	<string>914352196749</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.borezy.customerapp</string>
+	<key>PROJECT_ID</key>
+	<string>renting-wala-27d06</string>
+	<key>STORAGE_BUCKET</key>
+	<string>renting-wala-27d06.appspot.com</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:914352196749:ios:6a93ce65e860c91df866c4</string>
+	<key>DATABASE_URL</key>
+	<string>https://renting-wala-27d06-default-rtdb.firebaseio.com</string>
+</dict>
+</plist>
