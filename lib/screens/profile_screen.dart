@@ -14,8 +14,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
 
-  final String branchCode = "7007";
-int points = 0;
+  int points = 0;
   String customerName = "Customer";
   int rentals = 0;
 
@@ -29,50 +28,30 @@ int points = 0;
 
   Future<void> loadProfileData() async {
 
-  final phone = FirebaseAuth.instance.currentUser!.phoneNumber!;
-  final cleanPhone = phone.replaceAll("+91", "");
+    final phone = FirebaseAuth.instance.currentUser!.phoneNumber!;
+    final cleanPhone = phone.replaceAll("+91", "");
 
-  /// RENTALS
-  final paymentsQuery = await FirebaseFirestore.instance
-      .collection("products")
-      .doc(branchCode)
-      .collection("payments")
-      .where("contact", isEqualTo: cleanPhone)
-      .get();
+    final customerDoc = await FirebaseFirestore.instance
+        .collection("customers")
+        .doc(cleanPhone)
+        .get();
 
-  rentals = paymentsQuery.docs.length;
+    if (customerDoc.exists) {
 
-  if (paymentsQuery.docs.isNotEmpty) {
-    customerName = paymentsQuery.docs.first["clientName"] ?? "Customer";
+      final data = customerDoc.data()!;
+
+      rentals = data["receiptCount"] ?? 0;
+
+      points = (data["creditBalanceTotal"] ?? 0).toInt();
+
+      customerName = data["name"] ?? "Customer";
+
+    }
+
+    setState(() {
+      loading = false;
+    });
   }
-
-  /// CREDIT NOTE → POINTS
-  final creditQuery = await FirebaseFirestore.instance
-      .collection("products")
-      .doc(branchCode)
-      .collection("creditNotes")
-      .where("mobileNumber", isEqualTo: cleanPhone)
-      .where("status", isEqualTo: "active")
-      .get();
-
-  if (creditQuery.docs.isNotEmpty) {
-
-    final data = creditQuery.docs.first.data();
-
-    points = int.tryParse(
-        data["Balance"].toString()
-    ) ?? 0;
-
-  } else {
-
-    points = 0;
-
-  }
-
-  setState(() {
-    loading = false;
-  });
-}
 
   Widget buildMenuItem({
     required IconData icon,
@@ -242,25 +221,26 @@ int points = 0;
                         ],
                       ),
 
-                    Column(
-  children: [
-    Text(
-      "$points",
-      style: const TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-    const Text(
-      "POINTS",
-      style: TextStyle(
-        fontSize: 12,
-        letterSpacing: 1.2,
-        color: Colors.black54,
-      ),
-    ),
-  ],
-),
+                      Column(
+                        children: [
+                          Text(
+                            "$points",
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Text(
+                            "POINTS",
+                            style: TextStyle(
+                              fontSize: 12,
+                              letterSpacing: 1.2,
+                              color: Colors.black54,
+                            ),
+                          ),
+                        ],
+                      ),
+
                     ],
                   )
                 ],
@@ -385,8 +365,6 @@ int points = 0;
           ],
         ),
       ),
-
-      
     );
   }
 }

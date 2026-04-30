@@ -7,6 +7,8 @@ import '../theme/app_colors.dart';
 import '../theme/app_gradients.dart';
 import 'home_screen.dart';
 import 'main_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'city_selection_screen.dart';
 class OtpScreen extends StatefulWidget {
   final AuthService authService;
 
@@ -55,20 +57,37 @@ class _OtpScreenState extends State<OtpScreen>
     );
   }
 
-  void verifyOtp() async {
+ void verifyOtp() async {
 
-    if (otpCode.length < 6) {
-      shakeController.forward(from: 0);
-      return;
-    }
+  if (otpCode.length < 6) {
+    shakeController.forward(from: 0);
+    return;
+  }
 
-    setState(() {
-      loading = true;
-    });
+  setState(() {
+    loading = true;
+  });
 
-    try {
+  try {
 
-      await widget.authService.verifyOtp(otpCode);
+    await widget.authService.verifyOtp(otpCode);
+
+    final prefs = await SharedPreferences.getInstance();
+    String? city = prefs.getString("selectedCity");
+
+    if (!mounted) return;
+
+    if (city == null) {
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const CitySelectionScreen(),
+        ),
+        (route) => false,
+      );
+
+    } else {
 
       Navigator.pushAndRemoveUntil(
         context,
@@ -78,20 +97,24 @@ class _OtpScreenState extends State<OtpScreen>
         (route) => false,
       );
 
-    } catch (e) {
-
-      shakeController.forward(from: 0);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid OTP")),
-      );
-
     }
 
+  } catch (e) {
+
+    shakeController.forward(from: 0);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Invalid OTP")),
+    );
+
+  }
+
+  if (mounted) {
     setState(() {
       loading = false;
     });
   }
+}
 
   @override
   void dispose() {

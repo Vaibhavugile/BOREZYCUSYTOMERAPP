@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'BookingDetailsScreen.dart';
 
 class BookingListScreen extends StatefulWidget {
   const BookingListScreen({super.key});
@@ -11,25 +12,55 @@ class BookingListScreen extends StatefulWidget {
 
 class _BookingListScreenState extends State<BookingListScreen> {
 
-  final String branchCode = "7007";
-
   int selectedTab = 0;
 
   String formatDate(DateTime date) {
     return "${date.day}/${date.month}";
   }
 
-  bool isUpcoming(DateTime pickup) {
-    return pickup.isAfter(DateTime.now());
+  bool matchStage(String stage) {
+
+    if (selectedTab == 0) {
+      return stage == "Booking" || stage == "pickupPending";
+    }
+
+    if (selectedTab == 1) {
+      return stage == "pickup" ||
+          stage == "returnPending" ||
+          stage == "return";
+    }
+
+    if (selectedTab == 2) {
+      return stage == "successful" ||
+          stage == "cancelled" ||
+          stage == "postponed";
+    }
+
+    return false;
   }
 
-  bool isPast(DateTime returnDate) {
-    return returnDate.isBefore(DateTime.now());
-  }
+  Color stageColor(String stage) {
 
-  bool isCurrent(DateTime pickup, DateTime returnDate) {
-    final now = DateTime.now();
-    return pickup.isBefore(now) && returnDate.isAfter(now);
+    switch(stage){
+
+      case "Booking":
+      case "pickupPending":
+        return Colors.orange;
+
+      case "pickup":
+      case "returnPending":
+      case "return":
+        return Colors.blue;
+
+      case "successful":
+        return Colors.green;
+
+      case "cancelled":
+        return Colors.red;
+
+      default:
+        return Colors.grey;
+    }
   }
 
   @override
@@ -39,9 +70,7 @@ class _BookingListScreenState extends State<BookingListScreen> {
     final cleanPhone = phone.replaceAll("+91", "");
 
     final stream = FirebaseFirestore.instance
-        .collection("products")
-        .doc(branchCode)
-        .collection("payments")
+        .collectionGroup("payments")
         .where("contact", isEqualTo: cleanPhone)
         .orderBy("createdAt", descending: true)
         .snapshots();
@@ -55,91 +84,59 @@ class _BookingListScreenState extends State<BookingListScreen> {
         backgroundColor: Colors.white,
         title: const Text(
           "My Bookings",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold,color: Colors.black),
         ),
       ),
 
       body: Column(
-
         children: [
 
-          const SizedBox(height: 20),
+          const SizedBox(height:20),
 
           /// TAB BAR
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal:20),
             child: Container(
-
               decoration: BoxDecoration(
                 color: Colors.grey.shade200,
                 borderRadius: BorderRadius.circular(14),
               ),
-
               child: Row(
-
                 children: [
-
-                  buildTab("Upcoming", 0),
-                  buildTab("Current", 1),
-                  buildTab("Past", 2),
-
+                  buildTab("Upcoming",0),
+                  buildTab("Current",1),
+                  buildTab("Past",2),
                 ],
               ),
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height:20),
 
-          /// BOOKINGS
           Expanded(
-
             child: StreamBuilder<QuerySnapshot>(
 
               stream: stream,
 
-              builder: (context, snapshot) {
+              builder:(context,snapshot){
 
-                if (!snapshot.hasData) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
+                if(!snapshot.hasData){
+                  return const Center(child:CircularProgressIndicator());
                 }
 
                 final docs = snapshot.data!.docs;
 
-                List filteredDocs = [];
+                final filteredDocs = docs.where((doc){
 
-                for (var doc in docs) {
+                  final data = doc.data() as Map<String,dynamic>;
+                  final stage = data["bookingStage"] ?? "";
 
-                  final data = doc.data() as Map<String, dynamic>;
+                  return matchStage(stage);
 
-                  final pickup =
-                      (data["pickupDate"] as Timestamp).toDate();
+                }).toList();
 
-                  final returnDate =
-                      (data["returnDate"] as Timestamp).toDate();
-
-                  if (selectedTab == 0 && isUpcoming(pickup)) {
-                    filteredDocs.add(data);
-                  }
-
-                  if (selectedTab == 1 &&
-                      isCurrent(pickup, returnDate)) {
-                    filteredDocs.add(data);
-                  }
-
-                  if (selectedTab == 2 && isPast(returnDate)) {
-                    filteredDocs.add(data);
-                  }
-                }
-
-                if (filteredDocs.isEmpty) {
-                  return const Center(
-                    child: Text("No bookings found"),
-                  );
+                if(filteredDocs.isEmpty){
+                  return const Center(child:Text("No bookings found"));
                 }
 
                 return ListView.builder(
@@ -148,9 +145,10 @@ class _BookingListScreenState extends State<BookingListScreen> {
 
                   itemCount: filteredDocs.length,
 
-                  itemBuilder: (context, index) {
+                  itemBuilder:(context,index){
 
-                    final data = filteredDocs[index];
+                    final data =
+                        filteredDocs[index].data() as Map<String,dynamic>;
 
                     final receipt = data["receiptNumber"];
                     final stage = data["bookingStage"];
@@ -162,126 +160,196 @@ class _BookingListScreenState extends State<BookingListScreen> {
                     final returnDate =
                         (data["returnDate"] as Timestamp).toDate();
 
-                    return Container(
+                    final products = data["products"] ?? [];
 
-                      margin: const EdgeInsets.only(bottom: 20),
+                    String image = "";
+                    if(products.isNotEmpty){
+                      image = products[0]["imageUrl"] ?? "";
+                    }
 
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(.05),
-                            blurRadius: 18,
-                          )
-                        ],
-                      ),
+                    List codes =
+                        products.map((p)=>p["productCode"]).toList();
 
-                      child: Padding(
+                    return GestureDetector(
 
-                        padding: const EdgeInsets.all(18),
+                      onTap: (){
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                BookingDetailsScreen(booking: data),
+                          ),
+                        );
+                      },
 
-                        child: Row(
+                      child: Container(
 
+                        margin: const EdgeInsets.only(bottom:18),
+                        padding: const EdgeInsets.all(16),
+
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow:[
+                            BoxShadow(
+                              color: Colors.black.withOpacity(.05),
+                              blurRadius:16,
+                            )
+                          ],
+                        ),
+
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
 
-                            /// IMAGE
-                            ClipRRect(
-                              borderRadius:
-                                  BorderRadius.circular(12),
-                              child: Image.network(
-                                "https://picsum.photos/200",
-                                width: 90,
-                                height: 120,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children:[
 
-                            const SizedBox(width: 14),
-
-                            /// DETAILS
-                            Expanded(
-
-                              child: Column(
-
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-
-                                children: [
-
-                                  /// STATUS
-                                  Container(
-                                    padding: const EdgeInsets
-                                        .symmetric(
-                                            horizontal: 10,
-                                            vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.purple
-                                          .withOpacity(.1),
-                                      borderRadius:
-                                          BorderRadius.circular(
-                                              20),
-                                    ),
-                                    child: Text(
-                                      stage,
-                                      style: const TextStyle(
-                                        color: Colors.purple,
-                                        fontWeight:
-                                            FontWeight.w600,
-                                      ),
-                                    ),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: image.isNotEmpty
+                                      ? Image.network(
+                                    image,
+                                    width:80,
+                                    height:110,
+                                    fit:BoxFit.cover,
+                                  )
+                                      : Container(
+                                    width:80,
+                                    height:110,
+                                    color: Colors.grey.shade200,
+                                    child: const Icon(Icons.image),
                                   ),
+                                ),
 
-                                  const SizedBox(height: 6),
+                                const SizedBox(width:14),
 
-                                  Text(
-                                    receipt,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight:
-                                          FontWeight.bold,
-                                    ),
-                                  ),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children:[
 
-                                  const SizedBox(height: 8),
-
-                                  Row(
-                                    children: [
-
-                                      const Icon(
-                                        Icons.calendar_today,
-                                        size: 16,
-                                        color: Colors.grey,
+                                      /// STAGE BADGE
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal:10,vertical:4),
+                                        decoration: BoxDecoration(
+                                          color: stageColor(stage).withOpacity(.15),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          stage,
+                                          style: TextStyle(
+                                            color: stageColor(stage),
+                                            fontWeight: FontWeight.w600,
+                                            fontSize:12,
+                                          ),
+                                        ),
                                       ),
 
-                                      const SizedBox(width: 6),
+                                      const SizedBox(height:6),
 
                                       Text(
-                                        "${formatDate(pickup)} - ${formatDate(returnDate)}",
+                                        receipt,
                                         style: const TextStyle(
-                                            color: Colors.grey),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize:16),
+                                      ),
+
+                                      const SizedBox(height:4),
+
+                                      Text(
+                                        "${products.length} items booked",
+                                        style: const TextStyle(
+                                            color: Colors.grey,fontSize:13),
                                       ),
 
                                     ],
                                   ),
-
-                                  const SizedBox(height: 10),
-
-                                  Text(
-                                    "₹$amount",
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight:
-                                          FontWeight.bold,
-                                      color: Colors.purple,
-                                    ),
-                                  ),
-
-                                ],
-                              ),
+                                )
+                              ],
                             ),
 
-                            const Icon(Icons.more_vert)
+                            const SizedBox(height:14),
+
+                            /// PRODUCT CODES
+                            Wrap(
+                              spacing:6,
+                              runSpacing:6,
+                              children:[
+
+                                ...codes.take(4).map((code){
+
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal:10,vertical:4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      code.toString(),
+                                      style: const TextStyle(
+                                          fontSize:12,
+                                          fontWeight: FontWeight.w500),
+                                    ),
+                                  );
+
+                                }),
+
+                                if(codes.length > 4)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal:10,vertical:4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.purple.withOpacity(.1),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      "+${codes.length - 4}",
+                                      style: const TextStyle(
+                                        fontSize:12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.purple,
+                                      ),
+                                    ),
+                                  )
+
+                              ],
+                            ),
+
+                            const SizedBox(height:12),
+
+                            const Divider(),
+
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children:[
+
+                                Row(
+                                  children:[
+                                    const Icon(Icons.calendar_today,
+                                        size:16,color: Colors.grey),
+                                    const SizedBox(width:6),
+                                    Text(
+                                      "${formatDate(pickup)} - ${formatDate(returnDate)}",
+                                      style: const TextStyle(color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+
+                                Text(
+                                  "₹$amount",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize:16,
+                                    color: Colors.purple,
+                                  ),
+                                )
+
+                              ],
+                            )
 
                           ],
                         ),
@@ -297,28 +365,25 @@ class _BookingListScreenState extends State<BookingListScreen> {
     );
   }
 
-  Widget buildTab(String title, int index) {
+  Widget buildTab(String title,int index){
 
     final isSelected = selectedTab == index;
 
     return Expanded(
       child: GestureDetector(
 
-        onTap: () {
+        onTap:(){
           setState(() {
             selectedTab = index;
           });
         },
 
         child: Container(
-
-          padding: const EdgeInsets.symmetric(vertical: 14),
-
+          padding: const EdgeInsets.symmetric(vertical:14),
           decoration: BoxDecoration(
             color: isSelected ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
           ),
-
           child: Center(
             child: Text(
               title,
