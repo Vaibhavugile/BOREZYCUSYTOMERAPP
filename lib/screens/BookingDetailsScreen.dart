@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
-
+import '../services/tenant_config.dart';
 class BookingDetailsScreen extends StatelessWidget {
 final Map<String, dynamic> booking;
 
@@ -118,50 +118,54 @@ return Container(
     children: [
 
       Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+
+    Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
 
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-
-              const Text(
-                "Receipt Number",
-                style: TextStyle(color: Colors.white70),
-              ),
-
-              const SizedBox(height:4),
-
-              Text(
-                booking["receiptNumber"],
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-
-            ],
+          const Text(
+            "Receipt Number",
+            style: TextStyle(color: Colors.white70),
           ),
 
-          Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(.2),
-              borderRadius: BorderRadius.circular(20),
+          const SizedBox(height:4),
+
+          Text(
+            booking["receiptNumber"],
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
             ),
-            child: Text(
-              booking["bookingStage"].toString().toUpperCase(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          )
+          ),
 
         ],
       ),
+    ),
+
+    const SizedBox(width:10),
+
+    Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(.2),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        booking["bookingStage"].toString().toUpperCase(),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    )
+
+  ],
+),
 
       const SizedBox(height:16),
 
@@ -248,14 +252,29 @@ return _cardWrapper(
           child: ListTile(
 
             leading: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.network(
-                p["imageUrl"],
-                width:60,
-                height:80,
-                fit: BoxFit.cover,
-              ),
-            ),
+  borderRadius: BorderRadius.circular(10),
+  child: p["imageUrl"] != null && p["imageUrl"].toString().isNotEmpty
+      ? Image.network(
+          p["imageUrl"],
+          width: 60,
+          height: 80,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              width: 60,
+              height: 80,
+              color: Colors.grey.shade200,
+              child: const Icon(Icons.image, color: Colors.grey),
+            );
+          },
+        )
+      : Container(
+          width: 60,
+          height: 80,
+          color: Colors.grey.shade200,
+          child: const Icon(Icons.image, color: Colors.grey),
+        ),
+),
 
             title: Text(
               p["productName"],
@@ -332,14 +351,14 @@ Widget _paymentHistory(){
 
 return StreamBuilder(
 
-  stream: FirebaseFirestore.instance
-      .collection("branches")
-      .doc(booking["branchCode"])
-      .collection("payments")
-      .doc(booking["receiptNumber"])
-      .collection("transactions")
-      .orderBy("createdAt",descending:true)
-      .snapshots(),
+stream: FirebaseFirestore.instance
+    .collection("products")
+    .doc(TenantConfig.branchCode)
+    .collection("payments")
+    .doc(booking["receiptNumber"])
+    .collection("transactions")
+    .orderBy("createdAt", descending: true)
+    .snapshots(),
 
   builder:(context,snapshot){
 
@@ -513,7 +532,9 @@ return _cardWrapper(
               icon: const Icon(Icons.message),
               label: const Text("WhatsApp"),
               onPressed: (){
-                launchUrl(Uri.parse("https://wa.me/919999999999"));
+                launchUrl(
+  Uri.parse("https://wa.me/${TenantConfig.supportPhone}")
+);
               },
             ),
           ),
@@ -525,14 +546,16 @@ return _cardWrapper(
               icon: const Icon(Icons.phone),
               label: const Text("Call"),
               onPressed: (){
-                launchUrl(Uri.parse("tel:+919999999999"));
+                launchUrl(
+  Uri.parse("tel:+${TenantConfig.supportPhone}")
+);
               },
             ),
           ),
 
         ],
       )
-
+  
     ],
   ),
 );

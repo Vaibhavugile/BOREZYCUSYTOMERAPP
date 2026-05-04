@@ -3,7 +3,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'theme/app_theme.dart';
 import 'screens/login_screen.dart';
-
+import 'services/tenant_config.dart';
+import 'package:provider/provider.dart';
+import 'wishlist/wishlist_provider.dart';
 void main() async {
 
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,8 +13,16 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+   await TenantConfig.load();
 
-  runApp(const MyApp());
+  runApp(
+  MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => WishlistProvider()),
+    ],
+    child: const MyApp(),
+  ),
+);
 
 }
 

@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_gradients.dart';
+import '../services/tenant_config.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -28,30 +29,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> loadProfileData() async {
 
-    final phone = FirebaseAuth.instance.currentUser!.phoneNumber!;
-    final cleanPhone = phone.replaceAll("+91", "");
+  final phone = FirebaseAuth.instance.currentUser!.phoneNumber!;
+  final cleanPhone = phone.replaceAll("+91", "");
 
-    final customerDoc = await FirebaseFirestore.instance
-        .collection("customers")
-        .doc(cleanPhone)
-        .get();
+  final customerDoc = await FirebaseFirestore.instance
+      .collection("customers")
+      .doc(cleanPhone)
+      .get();
 
-    if (customerDoc.exists) {
+  if (customerDoc.exists) {
 
-      final data = customerDoc.data()!;
+    final data = customerDoc.data()!;
 
-      rentals = data["receiptCount"] ?? 0;
+    customerName = data["name"] ?? "Customer";
 
-      points = (data["creditBalanceTotal"] ?? 0).toInt();
+    final branchStats = data["branchStats"] ?? {};
 
-      customerName = data["name"] ?? "Customer";
+    final currentBranchStats =
+        branchStats[TenantConfig.branchCode] ?? {};
 
-    }
+    rentals = currentBranchStats["receipts"] ?? 0;
 
-    setState(() {
-      loading = false;
-    });
+    points = (currentBranchStats["creditBalance"] ?? 0).toInt();
+
   }
+
+  setState(() {
+    loading = false;
+  });
+}
 
   Widget buildMenuItem({
     required IconData icon,
@@ -92,14 +98,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       appBar: AppBar(
         centerTitle: true,
-        title: const Text(
-          "BOREZY",
-          style: TextStyle(
-            color: AppColors.primary,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 4,
-          ),
-        ),
+       title: Text(
+  TenantConfig.appName,
+  style: const TextStyle(
+    color: AppColors.primary,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 4,
+  ),
+),
         leading: const Icon(Icons.menu),
         actions: const [
           Padding(
@@ -355,10 +361,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 30),
 
-            const Text(
-              "BOREZY V2.4.0 • CRAFTED FOR STYLE",
-              style: TextStyle(color: Colors.black45),
-            ),
+            Text(
+  "${TenantConfig.appName} V2.4.0",
+  style: const TextStyle(color: Colors.black45),
+),
 
             const SizedBox(height: 40),
 

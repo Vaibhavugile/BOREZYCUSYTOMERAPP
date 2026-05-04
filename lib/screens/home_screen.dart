@@ -5,7 +5,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-
+import '../services/tenant_config.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'product_list_screen.dart';
+import 'package:provider/provider.dart';
+import '../wishlist/wishlist_provider.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -15,17 +19,36 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
 
-  final List<String> banners = [
-  "https://firebasestorage.googleapis.com/v0/b/renting-wala-27d06.appspot.com/o/products%2F7007%2F3445567%2F1777542192372-h111.webp?alt=media&token=38bd2dab-9947-44fd-848d-282e23c6744a",
-"https://firebasestorage.googleapis.com/v0/b/renting-wala-27d06.appspot.com/o/products%2F7007%2F3445567%2F1777542198607-h133.webp?alt=media&token=ba683a47-4c3c-4542-af91-4fbe7b96dffe",
-"https://firebasestorage.googleapis.com/v0/b/renting-wala-27d06.appspot.com/o/products%2F7007%2F3445567%2F1777542203558-h211.webp?alt=media&token=be4eac36-df8d-4b36-891a-37990e7a35bc",
-"https://firebasestorage.googleapis.com/v0/b/renting-wala-27d06.appspot.com/o/products%2F7007%2F3445567%2F1777542209121-h222.webp?alt=media&token=8030ffc6-ed26-4dfc-b625-f3fd0a7602aa",
-"https://firebasestorage.googleapis.com/v0/b/renting-wala-27d06.appspot.com/o/products%2F7007%2F3445567%2F1777542216342-h1422.webp?alt=media&token=6e5b7eb4-56f7-45ea-9385-535ea9ae9acc",
+List banners = [];
+bool bannersLoading = true;
 
-    "https://images.openai.com/static-rsc-4/mGqToIqQX0anumZAFEcDuYirLwMUQcpASgyLFXZZi4r1XsJi5Y2W_m8hueDROjHCv3en_kjIctrCvG1LcD3EHqZEYoAJTh116vDhw41NEeHG3YJGkEV3nnMCF3lEdXkE4vURLNXmzIKiekAb5UDJroGiA-8pBW0dsxfHpwTiuz10XHBZP1-UNLyGla-uYDJb?purpose=fullsize",
-    "https://images.openai.com/static-rsc-4/_c9NVpLWJfDYhJWc4IY56LPDaSOzNj6rMrAM7NpCQ0HIvtahOaLsJBtC79pJ7DuWn_A64mqthAEgdrD0fzBTvcVLrZ4cy6t9ttUqdHr_HSOfmfCPq6ZxBehI5FF4aQposefR22Pv_MNrltgd2UgoPpONMJGCtkXT575dzQatV1p7-xnCnz6yoAMMoGW1OxJb?purpose=fullsize",
+Future<void> loadBanners() async {
 
-  ];
+final snap = await FirebaseFirestore.instance
+.collection("products")
+.doc(TenantConfig.branchCode)
+.collection("banners")
+.orderBy("createdAt", descending: true)
+.get();
+
+banners = snap.docs.map((d)=>d.data()["imageUrl"]).toList();
+
+setState(() {
+bannersLoading = false;
+});
+
+}
+@override
+void initState() {
+  super.initState();
+  loadBanners();
+
+  /// 🔥 LOAD WISHLIST FROM FIRESTORE
+  Future.microtask(() {
+    Provider.of<WishlistProvider>(context, listen: false)
+        .initWishlist();
+  });
+}
   int activeIndex = 0;
 final CarouselSliderController carouselController = CarouselSliderController();
   @override
@@ -51,8 +74,7 @@ final CarouselSliderController carouselController = CarouselSliderController();
 
                 _searchBar(),
 
-                const SizedBox(height:20),
-                _imageCategories(),  
+                
                 SizedBox(height:20),
 
                 _heroSlider(),
@@ -80,9 +102,7 @@ _occasionCarousel(),
 SizedBox(height:30),
 
 
-                _branches(),
-
-                const SizedBox(height:120),
+                
 
               ],
             ),
@@ -105,15 +125,15 @@ SizedBox(height:30),
       children: [
 
         /// LOGO
-        const Text(
-          "BOREZY",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-            letterSpacing: 1.5,
-            color: Colors.black,
-          ),
-        ),
+       Text(
+  TenantConfig.appName,
+  style: const TextStyle(
+    fontWeight: FontWeight.bold,
+    fontSize: 22,
+    letterSpacing: 1.5,
+    color: Colors.black,
+  ),
+),
 
         const Spacer(),
 
@@ -138,7 +158,39 @@ SizedBox(height:30),
 
         const SizedBox(width: 15),
 
-        const Icon(Icons.favorite_border),
+        Consumer<WishlistProvider>(
+  builder: (context, wishlist, _) {
+
+    final count = wishlist.wishlistIds.length;
+
+    return Stack(
+      children: [
+
+        const Icon(Icons.favorite_border, size: 26),
+
+        if (count > 0)
+          Positioned(
+            right: 0,
+            top: 0,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                count.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 8,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  },
+),
 
         const SizedBox(width: 15),
 
@@ -242,18 +294,22 @@ SizedBox(height:30),
           child: Column(
             children: [
 
-              Container(
-                height: 65,
-                width: 65,
+              ClipRRect(
+  borderRadius: BorderRadius.circular(18),
+  child: CachedNetworkImage(
+    imageUrl: items[i]["image"]!,
+    width: 65,
+    height: 65,
+    fit: BoxFit.cover,
 
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  image: DecorationImage(
-                    image: NetworkImage(items[i]["image"]!),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
+    placeholder: (context, url) => Container(
+      color: Colors.grey.shade200,
+    ),
+
+    errorWidget: (context, url, error) =>
+        const Icon(Icons.error),
+  ),
+),
 
               const SizedBox(height: 6),
 
@@ -274,7 +330,16 @@ SizedBox(height:30),
 
   /// HERO SLIDER
  Widget _heroSlider() {
+if (bannersLoading) {
+  return const SizedBox(
+    height: 280,
+    child: Center(child: CircularProgressIndicator()),
+  );
+}
 
+if (banners.isEmpty) {
+  return const SizedBox();
+}
   return Column(
     children: [
 
@@ -535,92 +600,113 @@ Widget _topStoriesSlider() {
 }
 
 Widget _miniTrendSlider() {
+
+return StreamBuilder(
+
+stream: FirebaseFirestore.instance
+.collection("products")
+.doc(TenantConfig.branchCode)
+.collection("collections")
+.snapshots(),
+
+builder: (context, snapshot) {
+
+if (!snapshot.hasData) {
+return const SizedBox(
+height: 200,
+child: Center(child: CircularProgressIndicator()),
+);
+}
+
+final collections = snapshot.data!.docs;
+
+return Column(
+crossAxisAlignment: CrossAxisAlignment.start,
+children: collections.map((collectionDoc) {
+
+final collectionId = collectionDoc.id;
+final data = collectionDoc.data();
+final title = data["title"] ?? "";
+
 return Column(
 crossAxisAlignment: CrossAxisAlignment.start,
 children: [
 
+/// COLLECTION TITLE (For Her / For Him etc)
+Padding(
+padding: const EdgeInsets.symmetric(horizontal: 20),
+child: Text(
+title,
+style: const TextStyle(
+fontSize: 22,
+fontWeight: FontWeight.bold,
+),
+),
+),
 
-  /// FOR HER
-  const Padding(
-    padding: EdgeInsets.symmetric(horizontal: 20),
-    child: Text(
-      "For Her",
-      style: TextStyle(
-        fontSize: 22,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-  ),
+const SizedBox(height: 14),
 
-  const SizedBox(height: 14),
+/// SUBCOLLECTIONS
+StreamBuilder(
 
-  _genderSlider([
-    {
-      "title": "Lehenga",
-      "image":
-          "https://firebasestorage.googleapis.com/v0/b/dressonrent-e51be.firebasestorage.app/o/category_images%2Fwomen%2F1777037686334_0727.webp?alt=media&token=f38a3156-d8cc-481b-9516-6e1339a9e7d3"
-    },
-    {
-      "title": "Bridal",
-      "image":
-          "https://firebasestorage.googleapis.com/v0/b/dressonrent-e51be.firebasestorage.app/o/category_images%2Fwomen%2F1777038649215_0534.webp?alt=media&token=f4b0573e-144c-4739-84c4-f850c950dc86"
-    },
-    {
-      "title": "Maternity\nGown",
-      "image":
-          "https://firebasestorage.googleapis.com/v0/b/dressonrent-e51be.firebasestorage.app/o/category_images%2Fwomen%2F1777038559603_0036%20(1).webp?alt=media&token=671033f8-5a1d-4a06-959b-c7d8763b1ac0"
-    },
-    {
-      "title": "Designer\nGown",
-      "image":
-          "https://firebasestorage.googleapis.com/v0/b/dressonrent-e51be.firebasestorage.app/o/category_images%2Fwomen%2F1777037665346_0548.webp?alt=media&token=39ce1f92-6c29-463d-b5c0-a86d88d074eb"
-    },
-  ]),
+stream: FirebaseFirestore.instance
+.collection("products")
+.doc(TenantConfig.branchCode)
+.collection("collections")
+.doc(collectionId)
+.collection("subcollections")
+.orderBy("createdAt", descending: true)
+.snapshots(),
 
-  const SizedBox(height: 28),
+builder: (context, subSnap) {
 
-  /// FOR HIM
-  const Padding(
-    padding: EdgeInsets.symmetric(horizontal: 20),
-    child: Text(
-      "For Him",
-      style: TextStyle(
-        fontSize: 22,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-  ),
-
-  const SizedBox(height: 14),
-
-  _genderSlider([
-    {
-      "title": "Jodhpuri",
-      "image":
-          "https://firebasestorage.googleapis.com/v0/b/dressonrent-e51be.firebasestorage.app/o/category_images%2Fmen%2F1774859915340_1774681546378_jodhpuri.webp?alt=media&token=2513dcb1-4bdd-478a-ac6e-9586971b3240"
-    },
-    {
-      "title": "Suits",
-      "image":
-          "https://firebasestorage.googleapis.com/v0/b/dressonrent-e51be.firebasestorage.app/o/category_images%2Fmen%2F1774859941775_1774681621407_suit.webp?alt=media&token=ce58b87d-8b4c-4423-93a5-993f9c9e2e41"
-    },
-    {
-      "title": "Blazers",
-      "image":
-          "https://firebasestorage.googleapis.com/v0/b/dressonrent-e51be.firebasestorage.app/o/category_images%2Fmen%2F1774859890472_1774681491397_blazzer%2011.webp?alt=media&token=8bc80a05-f751-4a34-ad04-f9b44c5d7b89"
-    },
-    {
-      "title": "Sherwani",
-      "image":
-          "https://firebasestorage.googleapis.com/v0/b/dressonrent-e51be.firebasestorage.app/o/category_images%2Fmen%2F1774859811487_1774681409809_sherwani.webp?alt=media&token=c01b8d95-dba3-4781-8b15-e1f390de4526"
-    },
-  ]),
-],
-
-
+if (!subSnap.hasData) {
+return const SizedBox(
+height: 200,
+child: Center(child: CircularProgressIndicator()),
 );
 }
-Widget _genderSlider(List<Map<String, String>> items) {
+
+final items = subSnap.data!.docs;
+
+if (items.isEmpty) {
+return const SizedBox();
+}
+
+return _genderSlider(
+
+items.map((doc) {
+
+final d = doc.data();
+
+return {
+"title": d["title"] ?? "",
+"image": d["imageUrl"] ?? "",
+};
+
+}).toList(),
+
+);
+
+},
+
+),
+
+const SizedBox(height: 28),
+
+],
+);
+
+}).toList(),
+
+);
+
+},
+
+);
+
+}
+Widget _genderSlider(List<Map<String, dynamic>> items) {
 
 return SizedBox(
 height: 220,
@@ -635,468 +721,460 @@ child: ListView.builder(
 
     final item = items[index];
 
-    return Container(
-      width: 160,
-      margin: const EdgeInsets.only(right: 14),
+   return GestureDetector(
 
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
+  onTap: () {
 
-        child: Stack(
-          children: [
-
-            CachedNetworkImage(
-              imageUrl: item["image"]!,
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-            ),
-
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.black.withOpacity(.65),
-                    Colors.transparent
-                  ],
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                ),
-              ),
-            ),
-
-            Positioned(
-              left: 14,
-              bottom: 14,
-              child: Text(
-                item["title"]!,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-            ),
-          ],
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProductListScreen(
+          title: item["title"], // 🔥 this connects everything
         ),
       ),
     );
+
+  },
+
+  child: Container(
+    width: 160,
+    margin: const EdgeInsets.only(right: 14),
+
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+
+      child: Stack(
+        children: [
+
+         CachedNetworkImage(
+  imageUrl: item["image"],
+  fit: BoxFit.cover,
+  width: double.infinity,
+  height: double.infinity,
+
+  placeholder: (context, url) => Container(
+    color: Colors.grey.shade200,
+  ),
+
+  errorWidget: (context, url, error) =>
+      const Icon(Icons.error),
+),
+
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.black.withOpacity(.6),
+                  Colors.transparent
+                ],
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+              ),
+            ),
+          ),
+
+          Positioned(
+            left: 12,
+            bottom: 12,
+            child: Text(
+              item["title"],
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          )
+
+        ],
+      ),
+    ),
+  ),
+);
   },
 ),
 
 
 );
 }
-Widget _occasionCarousel() {
+Widget _occasionCarousel(){
 
-final occasions = [
-{
-"title": "Wedding",
-"subtitle": "Royal Bridal & Groom Looks",
-"image": "https://images.unsplash.com/photo-1520854221256-17451cc331bf"
-},
-{
-"title": "Haldi",
-"subtitle": "Bright Yellow Celebration",
-"image": "https://images.unsplash.com/photo-1606800052052-a08af7148866"
-},
-{
-"title": "Sangeet",
-"subtitle": "Dance Ready Styles",
-"image": "https://images.unsplash.com/photo-1519741497674-611481863552"
-},
-{
-"title": "Reception",
-"subtitle": "Elegant Evening Looks",
-"image": "https://images.unsplash.com/photo-1509631179647-0177331693ae"
-},
-{
-"title": "Pre Wedding",
-"subtitle": "Photoshoot Perfect Outfits",
-"image": "https://images.unsplash.com/photo-1511285560929-80b456fea0bc"
-},
-{
-"title": "Maternity",
-"subtitle": "Beautiful Maternity Gowns",
-"image": "https://images.unsplash.com/photo-1585487000160-6ebcfceb0d03"
-},
-];
+return StreamBuilder(
 
-return Column(
-crossAxisAlignment: CrossAxisAlignment.start,
-children: [
+stream: FirebaseFirestore.instance
+.collection("products")
+.doc(TenantConfig.branchCode)
+.collection("occasions")
+.orderBy("order")
+.snapshots(),
 
+builder:(context,snapshot){
 
-  /// PREMIUM HEADER
-  Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-
-        const Text(
-          "Select By Occasion",
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-
-        const SizedBox(height: 4),
-
-        Text(
-          "Find outfits for every celebration",
-          style: TextStyle(
-            color: Colors.grey.shade600,
-            fontSize: 14,
-          ),
-        ),
-
-        const SizedBox(height: 10),
-
-        Container(
-          height: 4,
-          width: 50,
-          decoration: BoxDecoration(
-            color: Colors.deepPurple,
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      ],
-    ),
-  ),
-
-  const SizedBox(height: 20),
-
-  /// OCCASION CAROUSEL
-  CarouselSlider.builder(
-    itemCount: occasions.length,
-
-    options: CarouselOptions(
-      height: 340,
-      viewportFraction: 0.72,
-      enlargeCenterPage: true,
-      autoPlay: true,
-      autoPlayInterval: const Duration(seconds: 4),
-    ),
-
-    itemBuilder: (context, index, realIndex) {
-
-      final item = occasions[index];
-
-      return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 6),
-
-        decoration: BoxDecoration(
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(30),
-            topRight: Radius.circular(10),
-            bottomLeft: Radius.circular(10),
-            bottomRight: Radius.circular(30),
-          ),
-          boxShadow: [
-            BoxShadow(
-              blurRadius: 22,
-              color: Colors.black.withOpacity(.18),
-              offset: const Offset(0, 12),
-            )
-          ],
-        ),
-
-        child: ClipRRect(
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(30),
-            topRight: Radius.circular(10),
-            bottomLeft: Radius.circular(10),
-            bottomRight: Radius.circular(30),
-          ),
-
-          child: Stack(
-            children: [
-
-              /// IMAGE
-              Transform.scale(
-                scale: 1.05,
-                child: CachedNetworkImage(
-                  imageUrl: item["image"]!,
-                  width: double.infinity,
-                  height: double.infinity,
-                  fit: BoxFit.cover,
-                ),
-              ),
-
-              /// GRADIENT
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.black.withOpacity(.75),
-                      Colors.transparent
-                    ],
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                  ),
-                ),
-              ),
-
-              /// OCCASION BADGE
-              Positioned(
-                top: 16,
-                left: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    item["title"]!,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
-
-              /// CENTER TEXT
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-
-                    Text(
-                      item["title"]!,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-
-                    const SizedBox(height: 6),
-
-                    Text(
-                      item["subtitle"]!,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(.95),
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            blurRadius: 10,
-                            color: Colors.black.withOpacity(.2),
-                          )
-                        ],
-                      ),
-                      child: const Text(
-                        "Explore Collection",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    )
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  ),
-
-  const SizedBox(height: 10),
-],
-
-
+if(!snapshot.hasData){
+return const SizedBox(
+height:300,
+child:Center(child:CircularProgressIndicator())
 );
 }
-Widget _promotionsSlider() {
 
-final promos = [
-{
-"title": "Wedding Season Sale",
-"subtitle": "Up to 40% Off Bridal Rentals",
-"discount": "40% OFF",
-"image":
-"https://images.unsplash.com/photo-1520854221256-17451cc331bf"
-},
-{
-"title": "Groom Special",
-"subtitle": "Sherwani Rentals Starting ₹799",
-"discount": "30% OFF",
-"image":
-"https://images.unsplash.com/photo-1617127365659-c47fa864d8bc"
-},
-{
-"title": "Couple Combo",
-"subtitle": "Bride + Groom Package Deals",
-"discount": "SAVE ₹2000",
-"image":
-"https://images.unsplash.com/photo-1519741497674-611481863552"
-},
-{
-"title": "Pre-Wedding Shoot",
-"subtitle": "Perfect Outfits for Your Photos",
-"discount": "25% OFF",
-"image":
-"https://images.unsplash.com/photo-1511285560929-80b456fea0bc"
-},
-];
+final occasions = snapshot.data!.docs;
 
 return Column(
 crossAxisAlignment: CrossAxisAlignment.start,
-children: [
+children:[
 
+/// HEADER
+Padding(
+padding: const EdgeInsets.symmetric(horizontal:20),
+child: Column(
+crossAxisAlignment: CrossAxisAlignment.start,
+children:[
 
-  /// HEADER
-  const Padding(
-    padding: EdgeInsets.symmetric(horizontal: 20),
-    child: Text(
-      "Offers & Promotions",
-      style: TextStyle(
-        fontSize: 24,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-  ),
+const Text(
+"Select By Occasion",
+style: TextStyle(
+fontSize:28,
+fontWeight:FontWeight.bold
+),
+),
 
-  const SizedBox(height: 16),
+const SizedBox(height:4),
 
-  CarouselSlider.builder(
-    itemCount: promos.length,
+Text(
+"Find outfits for every celebration",
+style: TextStyle(
+color: Colors.grey.shade600,
+fontSize:14
+),
+),
 
-    options: CarouselOptions(
-      height: 180,
-      viewportFraction: 0.9,
-      enlargeCenterPage: true,
-      autoPlay: true,
-      autoPlayInterval: Duration(seconds: 4),
-    ),
+const SizedBox(height:10),
 
-    itemBuilder: (context, index, realIndex) {
+Container(
+height:4,
+width:50,
+decoration: BoxDecoration(
+color: Colors.deepPurple,
+borderRadius: BorderRadius.circular(10)
+),
+)
 
-      final item = promos[index];
-
-      return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 6),
-
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              blurRadius: 18,
-              color: Colors.black.withOpacity(.15),
-              offset: const Offset(0, 8),
-            )
-          ],
-        ),
-
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-
-          child: Stack(
-            children: [
-
-              /// IMAGE
-              CachedNetworkImage(
-                imageUrl: item["image"]!,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-              ),
-
-              /// GRADIENT
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.black.withOpacity(.6),
-                      Colors.transparent
-                    ],
-                    begin: Alignment.bottomLeft,
-                    end: Alignment.topRight,
-                  ),
-                ),
-              ),
-
-              /// TEXT
-              Positioned(
-                left: 16,
-                bottom: 16,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-
-                    Text(
-                      item["title"]!,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-
-                    const SizedBox(height: 2),
-
-                    Text(
-                      item["subtitle"]!,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
-                    ),
-
-                    const SizedBox(height: 6),
-
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        item["discount"]!,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    )
-                  ],
-                ),
-              )
-            ],
-          ),
-        ),
-      );
-    },
-  ),
 ],
+),
+),
 
+const SizedBox(height:20),
+
+CarouselSlider.builder(
+
+itemCount: occasions.length,
+
+options: CarouselOptions(
+height:340,
+viewportFraction:0.72,
+enlargeCenterPage:true,
+autoPlay:true
+),
+
+itemBuilder:(context,index,realIndex){
+
+final item = occasions[index].data();
+
+return _occasionCard(
+item["title"],
+item["subtitle"],
+item["imageUrl"]
+);
+
+}
+
+),
+
+const SizedBox(height:10)
+
+]
 
 );
+
+}
+
+);
+
+}
+Widget _occasionCard(String title,String subtitle,String image){
+
+return Container(
+margin: const EdgeInsets.symmetric(horizontal:6),
+
+decoration: BoxDecoration(
+borderRadius: const BorderRadius.only(
+topLeft: Radius.circular(30),
+topRight: Radius.circular(10),
+bottomLeft: Radius.circular(10),
+bottomRight: Radius.circular(30),
+),
+boxShadow:[
+BoxShadow(
+blurRadius:22,
+color: Colors.black.withOpacity(.18),
+offset: const Offset(0,12)
+)
+]
+),
+
+child: ClipRRect(
+
+borderRadius: const BorderRadius.only(
+topLeft: Radius.circular(30),
+topRight: Radius.circular(10),
+bottomLeft: Radius.circular(10),
+bottomRight: Radius.circular(30),
+),
+
+child: Stack(
+
+children:[
+
+CachedNetworkImage(
+imageUrl:image,
+width:double.infinity,
+height:double.infinity,
+fit:BoxFit.cover
+),
+
+Container(
+decoration: BoxDecoration(
+gradient: LinearGradient(
+colors:[
+Colors.black.withOpacity(.75),
+Colors.transparent
+],
+begin:Alignment.bottomCenter,
+end:Alignment.topCenter
+)
+),
+),
+
+Center(
+child: Column(
+mainAxisAlignment: MainAxisAlignment.center,
+children:[
+
+Text(
+title,
+style: const TextStyle(
+color:Colors.white,
+fontSize:26,
+fontWeight:FontWeight.bold
+),
+),
+
+const SizedBox(height:6),
+
+Text(
+subtitle,
+style: const TextStyle(
+color:Colors.white70,
+fontSize:14
+),
+textAlign: TextAlign.center,
+)
+
+],
+),
+)
+
+]
+
+)
+
+)
+
+);
+
+}
+Widget _promotionsSlider(){
+
+return StreamBuilder(
+
+stream: FirebaseFirestore.instance
+.collection("products")
+.doc(TenantConfig.branchCode)
+.collection("promotions")
+.orderBy("order")
+.snapshots(),
+
+builder:(context,snapshot){
+
+if(!snapshot.hasData){
+
+return const SizedBox(
+height:200,
+child:Center(child:CircularProgressIndicator())
+);
+
+}
+
+final promos = snapshot.data!.docs;
+
+return Column(
+crossAxisAlignment: CrossAxisAlignment.start,
+children:[
+
+const Padding(
+padding: EdgeInsets.symmetric(horizontal:20),
+child: Text(
+"Offers & Promotions",
+style: TextStyle(
+fontSize:24,
+fontWeight:FontWeight.bold
+),
+),
+),
+
+const SizedBox(height:16),
+
+CarouselSlider.builder(
+
+itemCount: promos.length,
+
+options: CarouselOptions(
+height:180,
+viewportFraction:0.9,
+enlargeCenterPage:true,
+autoPlay:true
+),
+
+itemBuilder:(context,index,realIndex){
+
+final item = promos[index].data();
+
+return _promotionCard(
+item["title"],
+item["subtitle"],
+item["discount"],
+item["imageUrl"]
+);
+
+}
+
+)
+
+]
+
+);
+
+}
+
+);
+
+}
+Widget _promotionCard(
+String title,
+String subtitle,
+String discount,
+String image
+){
+
+return Container(
+margin: const EdgeInsets.symmetric(horizontal:6),
+
+decoration: BoxDecoration(
+borderRadius: BorderRadius.circular(20),
+boxShadow:[
+BoxShadow(
+blurRadius:18,
+color: Colors.black.withOpacity(.15),
+offset: const Offset(0,8)
+)
+]
+),
+
+child: ClipRRect(
+borderRadius: BorderRadius.circular(20),
+
+child: Stack(
+
+children:[
+
+CachedNetworkImage(
+imageUrl:image,
+fit:BoxFit.cover,
+width:double.infinity,
+height:double.infinity
+),
+
+Container(
+decoration: BoxDecoration(
+gradient: LinearGradient(
+colors:[
+Colors.black.withOpacity(.6),
+Colors.transparent
+],
+begin:Alignment.bottomLeft,
+end:Alignment.topRight
+)
+),
+),
+
+Positioned(
+left:16,
+bottom:16,
+child: Column(
+crossAxisAlignment: CrossAxisAlignment.start,
+children:[
+
+Text(
+title,
+style: const TextStyle(
+color:Colors.white,
+fontSize:18,
+fontWeight:FontWeight.bold
+),
+),
+
+const SizedBox(height:2),
+
+Text(
+subtitle,
+style: const TextStyle(
+color:Colors.white70,
+fontSize:13
+),
+),
+
+const SizedBox(height:6),
+
+Container(
+padding: const EdgeInsets.symmetric(
+horizontal:12,
+vertical:4
+),
+decoration: BoxDecoration(
+color: Colors.white,
+borderRadius: BorderRadius.circular(20)
+),
+child: Text(
+discount,
+style: const TextStyle(
+fontWeight:FontWeight.bold,
+fontSize:12
+),
+),
+)
+
+]
+)
+)
+
+]
+
+)
+
+)
+
+);
+
 }
 
 
@@ -1182,106 +1260,92 @@ children: [
 }
 
   /// BENTO COLLECTION GRID
- Widget _collectionsGrid() {
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 20),
+ Widget _collectionsGrid(){
 
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+return StreamBuilder(
 
-        const Text(
-          "Collections",
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+stream: FirebaseFirestore.instance
+.collection("products")
+.doc(TenantConfig.branchCode)
+.collection("collections")
+.snapshots(),
 
-        const SizedBox(height: 20),
+builder:(context,snapshot){
 
-        StaggeredGrid.count(
-          crossAxisCount: 2, // ⭐ important
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 16,
+if(!snapshot.hasData){
 
-          children: [
+return const Padding(
+padding: EdgeInsets.all(30),
+child: Center(child:CircularProgressIndicator()),
+);
 
-            /// WOMEN (BIG)
-            StaggeredGridTile.count(
-              crossAxisCellCount: 2,
-              mainAxisCellCount: 1.4,
-              child: _collectionCard(
-                "Women",
-                "https://firebasestorage.googleapis.com/v0/b/renting-wala-27d06.appspot.com/o/products%2F7007%2F3456789%2F1777489630637-7ca1239b-305f-43cd-aed2-18b43139a105.png?alt=media&token=4f7e05f0-e588-4ed6-84a1-71a869caa688",
-              ).animate().fade().scale(),
-            ),
+}
 
-            /// MEN
-            StaggeredGridTile.count(
-              crossAxisCellCount: 1,
-              mainAxisCellCount: 2,
-              child: _collectionCard(
-                "Men",
-                "https://lh3.googleusercontent.com/aida-public/AB6AXuD6HyG7fn8eybgpz-RJnKxHZb3c29QNiLPKFs1fIrKEFQ4titGT3lFfbu0mC6p-1Kk3-3vkTTbMj-LJtukn7ZwYHokQasI82sWgjHuMruQV6iC7Su6Tkd5OMzhAk6NabWuNtSPu_sCajR5UmVDzh3YOBj0az_eiwWcAtMImxdglHVDX-5GbF86OQiABQWsSsIOrwKmKBKl0qVAU-NqO9Bh5SPhFyNbNnFdBbzscnh03khE32I4x1jYLaqQlPvnaootDoGfP4FeppCw",
-              ),
-            ),
+final collections = snapshot.data!.docs;
 
-            /// BRIDAL
-            StaggeredGridTile.count(
-              crossAxisCellCount: 1,
-              mainAxisCellCount: 1,
-              child: _collectionCard(
-                "Bridal",
-                "https://lh3.googleusercontent.com/aida-public/AB6AXuCMbZo3-3ETipRGA3MBkRTLXDL1MvKGumqT6LtajN7b7Ojwh5SFMxNhcQZbMn3y7_KSCAXx9Zllg-kQPOhOJrJsoIbKqLjvj_PpKwJ_nv1MJK7wahfd58NxJIqcq7FjRzKhzdRg929x3OFNeyrQ5wHGpYAFZoYrD5PAAfT8c7xjRe7bZccy5ngVTesRB-yTMLAazG0564KQq0tzY8RwDx11veY3VPG0yxonG2z4Pod8NfIP1z-jbqFLRL7DWOYTkn7JOb8f-yvPMYQ",
-              ),
-            ),
+return Padding(
 
-            /// SHERWANI
-            StaggeredGridTile.count(
-              crossAxisCellCount: 1,
-              mainAxisCellCount: 1,
-              child: _collectionCard(
-                "Sherwani",
-                "https://lh3.googleusercontent.com/aida-public/AB6AXuBkm8vlzaY8F0BusG9KNxmXEuCOZoFZrMfFay6Mz6mGhVlfGLElwB_MSY-wlQkTszbN8rqC2JuDItvVp63zpolv7ZvrolCOfU-GEE15Ti-ax-SeaMTddh0jsBQ0csPxu2lxpNGiwXiyDuwLGfnD75M0iaIxEtbONlNe-23n1wWQee8ZhH6Z3MJXK8v092nmg1psRDXZCyabx0oRd_y4G07a5R2KtWDOe74K9yrN3o9BKtDJs9Qp0vaTpsWGpS2qG5VPCZHweCOcPRc",
-              ),
-            ),
+padding: const EdgeInsets.symmetric(horizontal:20),
 
-            /// RECEPTION
-            StaggeredGridTile.count(
-              crossAxisCellCount: 2,
-              mainAxisCellCount: 0.9,
-              child: _collectionCard(
-                "Reception",
-                "https://lh3.googleusercontent.com/aida-public/AB6AXuBKt1tINdA4f0UEt-nWqLfQPpeZBN2RyMQKHVSvxcOp_UkeeFsGVj_QbxhdimJJWHPJHzt_Iie94UO6jliv9oqt9T9avO-V7PcEVjMZwTQTXh4IJIWeU9p5UFc11FMxlOauFfQs9vzJfOEp8gnNFfg1KsKSNY29jgQ6Nz0WgMoEkDnosHyUielU7FeUFZil9ZaVZnvx8_D-n1QFrXE5CGpmVzHHBB7UQS1EENWtUzlMzzyj8PTy4ze_DdXbUQ07adbJE4ymv_xA9KY",
-              ),
-            ),
+child: Column(
+crossAxisAlignment: CrossAxisAlignment.start,
+children: [
 
-            /// KIDS
-            StaggeredGridTile.count(
-              crossAxisCellCount: 1,
-              mainAxisCellCount: 1,
-              child: _collectionCard(
-                "Kids",
-                "https://lh3.googleusercontent.com/aida-public/AB6AXuBufWYlyQ8xFB5brDHX0Z-0wvJ60GoR-NJNRZizr00WhjTvZNVqQvDBUlt7-d9lP6WBegY3RHYus3ukcIEChsQLPXhFe97xca-nHa39stzsWR0VKaPtp_fRQSo7ADFgKhNwUzKlZBkrdjSG0d1VwOPnufXbSmR879WJrq3xye4DDgx85LCiTmRNGpVh9jXX2aHWWq9MU0F2b7CLI64fLYkMHdmPK1UhWrqdbhYz6MHVwA-wiTf9uYZf8N-l-P6XmoAo8vC8qHwI0hQ",
-              ),
-            ),
+const Text(
+"Collections",
+style: TextStyle(
+fontSize:26,
+fontWeight:FontWeight.bold
+),
+),
 
-            /// ACCESSORIES
-            StaggeredGridTile.count(
-              crossAxisCellCount: 1,
-              mainAxisCellCount: 1,
-              child: _collectionCard(
-                "Accessories",
-                "https://lh3.googleusercontent.com/aida-public/AB6AXuBrWlE_ZPGGS4eGzmUfln3Z6D2-3yUlozcRAIe050GgINcxfoSva-q6UPC55gxw9v_9xgGoKinmqkoPCR3QoDvMNoYxPN80RkbWzeyja3f1oZ7_2dzNErArKeIPWdPwkFGIsq2RvTARG5kfXA-DJyqqOsNm5DDp8xCs-Q3CjkUCNP602fulhjPqYSBYu8VwqG3815jeFEuYpu1oi1QWxUidXx8qSh959TSlccgQRs1AiFIlYwRzcPk9ykOAz-WjM6dOP5Fv1HStBLs",
-              ),
-            ),
+const SizedBox(height:20),
 
-          ],
-        ),
-      ],
-    ),
-  );
+GridView.builder(
+
+  shrinkWrap: true,
+  physics: const NeverScrollableScrollPhysics(),
+
+  itemCount: collections.length,
+
+  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+
+    crossAxisCount: collections.length <= 2 ? 1 : 2,
+    crossAxisSpacing: 16,
+    mainAxisSpacing: 16,
+
+    /// Bigger cards when few collections
+    childAspectRatio: collections.length <= 2 ? 1.8 : 1.1,
+
+  ),
+
+  itemBuilder: (context, index) {
+
+    final data = collections[index].data();
+
+    return SizedBox(
+      height: collections.length <= 2 ? 220 : null,
+
+      child: _collectionCard(
+        data["title"],
+        data["imageUrl"],
+      ),
+    );
+
+  }
+
+)
+
+]
+
+)
+
+);
+
+}
+
+);
+
 }
   /// GLASSMORPHISM COLLECTION CARD
   Widget _collectionCard(String title,String image){

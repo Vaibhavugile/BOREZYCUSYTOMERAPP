@@ -3,7 +3,7 @@ import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_gradients.dart';
 import 'otp_screen.dart';
-
+import '../services/tenant_config.dart';
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -79,15 +79,15 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 30),
 
               /// TITLE
-              const Text(
-                "Welcome to BOREZY",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
+             Text(
+  "Welcome to ${TenantConfig.appName}",
+  textAlign: TextAlign.center,
+  style: const TextStyle(
+    fontSize: 32,
+    fontWeight: FontWeight.bold,
+    color: AppColors.textPrimary,
+  ),
+),
 
               const SizedBox(height: 12),
 
@@ -248,21 +248,22 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 30),
 
               /// CREATE ACCOUNT
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
+             Row(
+  mainAxisAlignment: MainAxisAlignment.center,
+  children: [
 
-                  Text("New to BOREZY? "),
-                  Text(
-                    "Create Account",
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
+    Text("New to ${TenantConfig.appName}? "),
 
-                ],
-              ),
+    const Text(
+      "Create Account",
+      style: TextStyle(
+        color: AppColors.primary,
+        fontWeight: FontWeight.bold,
+      ),
+    )
+
+  ],
+),
 
               const SizedBox(height: 20),
 

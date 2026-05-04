@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'BookingDetailsScreen.dart';
-
+import '../services/tenant_config.dart';
 class BookingListScreen extends StatefulWidget {
   const BookingListScreen({super.key});
 
@@ -70,10 +70,12 @@ class _BookingListScreenState extends State<BookingListScreen> {
     final cleanPhone = phone.replaceAll("+91", "");
 
     final stream = FirebaseFirestore.instance
-        .collectionGroup("payments")
-        .where("contact", isEqualTo: cleanPhone)
-        .orderBy("createdAt", descending: true)
-        .snapshots();
+    .collection("products")
+    .doc(TenantConfig.branchCode)
+    .collection("payments")
+    .where("contact", isEqualTo: cleanPhone)
+    .orderBy("createdAt", descending: true)
+    .snapshots();
 
     return Scaffold(
 
