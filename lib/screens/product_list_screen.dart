@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../wishlist/wishlist_provider.dart';
 import 'product_detail_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/tenant_config.dart';
 class ProductListScreen extends StatefulWidget {
   final String title;
+  final String collectionKey;
 
-  const ProductListScreen({super.key, required this.title});
+  const ProductListScreen({super.key, required this.title ,required this.collectionKey});
 
   @override
   State<ProductListScreen> createState() => _ProductListScreenState();
@@ -13,34 +16,7 @@ class ProductListScreen extends StatefulWidget {
 
 class _ProductListScreenState extends State<ProductListScreen> {
 
-  final List<Map<String, dynamic>> dummyProducts = List.generate(20, (index) {
-    final images = [
-      "https://firebasestorage.googleapis.com/v0/b/renting-wala-27d06.appspot.com/o/subcollections%2F7007%2F1777727877283_1777037665346_0548.webp?alt=media",
-      "https://firebasestorage.googleapis.com/v0/b/renting-wala-27d06.appspot.com/o/subcollections%2F7007%2F1777727678751_1777037686334_0727.webp?alt=media",
-      "https://firebasestorage.googleapis.com/v0/b/renting-wala-27d06.appspot.com/o/subcollections%2F7007%2F1777727709876_1777038649215_0534.webp?alt=media&token=51a34c88-11dc-4e19-b183-6db65cc4b60a",
-      "https://firebasestorage.googleapis.com/v0/b/renting-wala-27d06.appspot.com/o/subcollections%2F7007%2F1777727755759_1777038559603_0036%20(1).webp?alt=media&token=05214fc8-7a0e-4d5c-a514-fc28c072e8c9",
-    ];
-
-    final names = [
-  "Designer Bridal Lehenga",
-  "Embroidered Wedding Lehenga",
-  "Silk Saree with Zari Work",
-  "Floral Anarkali Gown",
-  "Party Wear Indo-Western Dress",
-  "Sequined Cocktail Gown",
-  "Traditional Banarasi Saree",
-  "Reception Lehenga Choli",
-  "Festive Sharara Set",
-  "Velvet Evening Gown",
-];
-
-    return {
-      "brand": "DOR ",
-      "name": names[index % names.length],
-      "price": 279 + index * 10,
-      "image": images[index % images.length],
-    };
-  });
+ 
 
   @override
   Widget build(BuildContext context) {
@@ -123,25 +99,54 @@ class _ProductListScreenState extends State<ProductListScreen> {
       ),
 
       /// 🔥 PRODUCT GRID
-      body: GridView.builder(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 80),
-        itemCount: dummyProducts.length,
+      body: StreamBuilder(
+  stream: FirebaseFirestore.instance
+      .collection("products")
+      .doc(TenantConfig.branchCode)
+      .collection("products")
+      .where(
+        "collectionKeys",
+        arrayContains: widget.collectionKey,
+      )
+      .snapshots(),
 
-        gridDelegate:
-            const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 16,
-          childAspectRatio: 0.60, // 🔥 BIGGER CARDS
-        ),
+  builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
 
-        itemBuilder: (context, index) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-          final product = dummyProducts[index];
+    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+      return const Center(child: Text("No products found"));
+    }
 
-          return _ProductCard(product: product);
-        },
+    final products = snapshot.data!.docs;
+
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 80),
+      itemCount: products.length,
+
+      gridDelegate:
+          const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 16,
+        childAspectRatio: 0.60,
       ),
+
+      itemBuilder: (context, index) {
+
+        final doc = products[index];
+        final product = Map<String, dynamic>.from(doc.data() as Map);
+
+        return _ProductCard(
+          product: product,
+          productId: doc.id, // 🔥 important
+        );
+      },
+    );
+  },
+),
 
       /// 🔥 BOTTOM BAR
       bottomNavigationBar: Container(
@@ -195,175 +200,239 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
 class _ProductCard extends StatelessWidget {
   final Map product;
+  final String productId;
 
-
-  const _ProductCard({required this.product});
+  const _ProductCard({
+    required this.product,
+    required this.productId,
+  });
 
   @override
   Widget build(BuildContext context) {
-  final wishlist = context.watch<WishlistProvider>();
-final isLiked = wishlist.isWishlisted(product["name"]);
+    final wishlist = context.watch<WishlistProvider>();
+    final safeId = productId.toString();
+final isLiked = wishlist.isWishlisted(safeId);
+
+    // 🔥 SAFE DATA MAPPING
+   final name = product["productName"]?.toString() ?? "";
+final brand = product["brandName"]?.toString() ?? "";
+  final rawPrice = product["price"];
+final productCode = product["productCode"]?.toString() ?? "";
+final price = rawPrice == null
+    ? 0
+    : int.tryParse(rawPrice.toString()) ?? 0;
+
+    final imageList = product["imageUrls"];
+
+final image = (imageList is List && imageList.isNotEmpty)
+    ? imageList[0].toString()
+    : "";
+
     return InkWell(
-  borderRadius: BorderRadius.circular(12),
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ProductDetailScreen(product: product),
-      ),
-    );
-  },
-  child: Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
-
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-
-          /// 🔥 FIXED IMAGE HEIGHT (KEY FIX)
-          SizedBox(
-            height: 200,
-            width: double.infinity,
-
-            child: Stack(
-              children: [
-
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    product["image"],
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: double.infinity,
-                  ),
-                ),
-
-                /// RATING
-                Positioned(
-                  left: 6,
-                  bottom: 6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 5, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Row(
-                      children: [
-                        Text("4.2", style: TextStyle(fontSize: 10)),
-                        SizedBox(width: 2),
-                        Icon(Icons.star, size: 11, color: Colors.green),
-                      ],
-                    ),
-                  ),
-                ),
-
-                /// HEART
-                Positioned(
-                  right: 6,
-                  top: 6,
-                  child: Container(
-                    padding: const EdgeInsets.all(5),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                   child: GestureDetector(
-  onTap: () {
-    wishlist.toggle(product);
-  },
-  child: Icon(
-    isLiked ? Icons.favorite : Icons.favorite_border,
-    color: isLiked ? Colors.red : Colors.black,
-    size: 18,
-  ),
-),
-                  ),
-                ),
-              ],
+      borderRadius: BorderRadius.circular(12),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProductDetailScreen(
+              product: product,
+              productId: productId,
             ),
           ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
 
-          /// 🔥 FLEXIBLE TEXT AREA (NO OVERFLOW)
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+
+            /// 🔥 IMAGE
+            SizedBox(
+              height: 200,
+              width: double.infinity,
+              child: Stack(
                 children: [
 
-                  /// BRAND
-                  Text(
-                    product["brand"],
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
+                 ClipRRect(
+  borderRadius: BorderRadius.circular(12),
+  child: image.isNotEmpty
+      ? Image.network(
+          image,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+
+          // 🔥 LOADING PLACEHOLDER
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+
+            return Container(
+              color: Colors.grey[200],
+              child: const Center(
+                child: SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          },
+
+          // 🔥 ERROR FALLBACK
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: Colors.grey[200],
+              child: const Center(
+                child: Icon(
+                  Icons.image_not_supported,
+                  color: Colors.grey,
+                ),
+              ),
+            );
+          },
+        )
+      : Container(
+          color: Colors.grey[200],
+          child: const Center(
+            child: Icon(
+              Icons.image,
+              color: Colors.grey,
+            ),
+          ),
+        ),
+),
+
+                  /// ⭐ RATING
+                  Positioned(
+                    left: 6,
+                    bottom: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        children: [
+                          Text("4.2", style: TextStyle(fontSize: 10)),
+                          SizedBox(width: 2),
+                          Icon(Icons.star, size: 11, color: Colors.green),
+                        ],
+                      ),
                     ),
                   ),
 
-                  const SizedBox(height: 2),
-
-                  /// NAME
-                  Text(
-                    product["name"],
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 11,
+                  /// ❤️ WISHLIST
+                  Positioned(
+                    right: 6,
+                    top: 6,
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: GestureDetector(
+                        onTap: () {
+                          wishlist.toggleById(safeId, product);
+                        },
+                        child: Icon(
+                          isLiked
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          color: isLiked
+                              ? Colors.red
+                              : Colors.black,
+                          size: 18,
+                        ),
+                      ),
                     ),
                   ),
-
-                  const SizedBox(height: 4),
-
-                  /// PRICE
-                  Row(
-                    children: [
-
-                      Text(
-                        "₹${product["price"] + 100}",
-                        style: const TextStyle(
-                          decoration: TextDecoration.lineThrough,
-                          fontSize: 10,
-                          color: Colors.grey,
-                        ),
-                      ),
-
-                      const SizedBox(width: 3),
-
-                      Text(
-                        "₹${product["price"]}",
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-
-                      const SizedBox(width: 3),
-
-                      const Text(
-                        "20% OFF",
-                        style: TextStyle(
-                          color: Colors.orange,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ),
-
                 ],
               ),
             ),
-          ),
-        ],
-      ),
+
+            /// 🔥 TEXT AREA
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+
+                    /// BRAND
+                   Text(
+  "$brand  •  $productCode",
+  maxLines: 1,
+  overflow: TextOverflow.ellipsis,
+  style: const TextStyle(
+    fontWeight: FontWeight.w600,
+    fontSize: 12,
+  ),
+),
+
+                    const SizedBox(height: 2),
+
+                    /// NAME
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 11,
+                      ),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    /// PRICE
+                    Row(
+                      children: [
+
+                        Text(
+                          "₹${price + 100}",
+                          style: const TextStyle(
+                            decoration: TextDecoration.lineThrough,
+                            fontSize: 10,
+                            color: Colors.grey,
+                          ),
+                        ),
+
+                        const SizedBox(width: 3),
+
+                        Text(
+                          "₹$price",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+
+                        const SizedBox(width: 3),
+
+                        const Text(
+                          "20% OFF",
+                          style: TextStyle(
+                            color: Colors.orange,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

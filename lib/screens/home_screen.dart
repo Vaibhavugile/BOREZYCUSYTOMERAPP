@@ -674,18 +674,18 @@ return const SizedBox();
 }
 
 return _genderSlider(
+  items.map((doc) {
 
-items.map((doc) {
+    final d = doc.data();
 
-final d = doc.data();
+    return {
+      "title": d["title"] ?? "",
+      "image": d["imageUrl"] ?? "",
+      "collectionId": collectionId,     // ✅ ADD THIS
+      "subcollectionId": doc.id,        // ✅ ADD THIS
+    };
 
-return {
-"title": d["title"] ?? "",
-"image": d["imageUrl"] ?? "",
-};
-
-}).toList(),
-
+  }).toList(),
 );
 
 },
@@ -728,9 +728,11 @@ child: ListView.builder(
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ProductListScreen(
-          title: item["title"], // 🔥 this connects everything
-        ),
+       builder: (_) => ProductListScreen(
+  title: item["title"],
+  collectionKey:
+      "${item["collectionId"]}_${item["subcollectionId"]}",
+),
       ),
     );
 
