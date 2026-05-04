@@ -21,32 +21,45 @@ class _HomeScreenState extends State<HomeScreen> {
 
 List banners = [];
 bool bannersLoading = true;
-
+bool loadRest = false;
 Future<void> loadBanners() async {
 
-final snap = await FirebaseFirestore.instance
-.collection("products")
-.doc(TenantConfig.branchCode)
-.collection("banners")
-.orderBy("createdAt", descending: true)
-.get();
+  final snap = await FirebaseFirestore.instance
+      .collection("products")
+      .doc(TenantConfig.branchCode)
+      .collection("banners")
+      .orderBy("createdAt", descending: true)
+      .get();
 
-banners = snap.docs.map((d)=>d.data()["imageUrl"]).toList();
+  banners = snap.docs.map((d) => d.data()["imageUrl"]).toList();
 
-setState(() {
-bannersLoading = false;
-});
+  /// 🔥 PRELOAD IMAGES
+  for (var img in banners) {
+    precacheImage(NetworkImage(img), context);
+  }
 
+  setState(() {
+    bannersLoading = false;
+  });
 }
 @override
 void initState() {
   super.initState();
+
   loadBanners();
 
-  /// 🔥 LOAD WISHLIST FROM FIRESTORE
   Future.microtask(() {
     Provider.of<WishlistProvider>(context, listen: false)
         .initWishlist();
+  });
+
+  /// 🔥 LOAD BELOW CONTENT ONCE
+  Future.delayed(const Duration(milliseconds: 300), () {
+    if (mounted) {
+      setState(() {
+        loadRest = true;
+      });
+    }
   });
 }
   int activeIndex = 0;
@@ -59,7 +72,7 @@ final CarouselSliderController carouselController = CarouselSliderController();
       backgroundColor: const Color(0xFFFCF9F8),
 
       body: CustomScrollView(
-
+      cacheExtent: 2000,
         physics: const BouncingScrollPhysics(),
 
         slivers: [
@@ -67,46 +80,52 @@ final CarouselSliderController carouselController = CarouselSliderController();
           _topBar(),
 
           SliverToBoxAdapter(
-            child: Column(
-              children: [
+  child: Column(
+    children: [
 
-                const SizedBox(height:20),
+      const SizedBox(height:20),
 
-                _searchBar(),
+      _searchBar(),
 
-                
-                SizedBox(height:20),
+      const SizedBox(height:20),
 
-                _heroSlider(),
+      _heroSlider(), // 👈 ONLY FAST SECTION
 
-                
+    ],
+  ),
+),
 
-                const SizedBox(height:30),
+/// 🔥 LAZY LOAD REST
+SliverToBoxAdapter(
+  child: loadRest
+      ? Column(
+          children: [
 
-                _collectionsGrid(),
+            const SizedBox(height:30),
 
-                const SizedBox(height:40),
-                
-_promotionsSlider(),
+            _collectionsGrid(),
 
+            const SizedBox(height:40),
 
-SizedBox(height:30),
-                _miniTrendSlider(),   // 👈 NEW MINI SLIDER
-   SizedBox(height:30),
+            _promotionsSlider(),
 
-_occasionCarousel(),
-   const SizedBox(height:40),
+            const SizedBox(height:30),
 
-                _topStoriesSlider(),
+            _miniTrendSlider(),
 
-SizedBox(height:30),
+            const SizedBox(height:30),
 
+            _occasionCarousel(),
 
-                
+            const SizedBox(height:40),
 
-              ],
-            ),
-          )
+            _topStoriesSlider(),
+
+            const SizedBox(height:30),
+          ],
+        )
+      : const SizedBox(),
+),
 
         ],
       ),
@@ -329,155 +348,146 @@ SizedBox(height:30),
 }
 
   /// HERO SLIDER
- Widget _heroSlider() {
-if (bannersLoading) {
-  return const SizedBox(
-    height: 280,
-    child: Center(child: CircularProgressIndicator()),
-  );
-}
+Widget _heroSlider() {
 
-if (banners.isEmpty) {
-  return const SizedBox();
-}
+  if (bannersLoading) {
+    return const SizedBox(
+      height: 280,
+      child: Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  if (banners.isEmpty) {
+    return const SizedBox();
+  }
+
   return Column(
     children: [
 
-      /// HERO CAROUSEL
-     CarouselSlider.builder(
-  carouselController: carouselController,
-
+      /// 🔥 HERO CAROUSEL
+      CarouselSlider.builder(
+        carouselController: carouselController,
         itemCount: banners.length,
 
         options: CarouselOptions(
-height: 280, // big banner like Myntra/Max
+          height: 220,
+          viewportFraction: 1.0,
+          enlargeCenterPage: false,
+          enableInfiniteScroll: true,
 
-viewportFraction: 1.0, // full width
-enlargeCenterPage: false, // disable center zoom
-enableInfiniteScroll: true,
+          /// 🔥 SMOOTH + LIGHT
+          autoPlay: false,
+          scrollPhysics: const BouncingScrollPhysics(),
+          pageSnapping: true,
 
-autoPlay: true,
-autoPlayInterval: const Duration(seconds: 4),
-autoPlayAnimationDuration: const Duration(milliseconds: 900),
-autoPlayCurve: Curves.easeInOut,
-
-scrollPhysics: const BouncingScrollPhysics(),
-
-pauseAutoPlayOnTouch: true,
-pauseAutoPlayOnManualNavigate: true,
-
-onPageChanged: (index, reason) {
-setState(() {
-activeIndex = index;
-});
-},
-),
+          onPageChanged: (index, reason) {
+            if (activeIndex != index) {
+              setState(() {
+                activeIndex = index;
+              });
+            }
+          },
+        ),
 
         itemBuilder: (context, index, realIndex) {
 
           final image = banners[index];
 
-          return Container(
-
-            margin: const EdgeInsets.symmetric(horizontal: 6),
-
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  blurRadius: 20,
-                  color: Colors.black.withOpacity(.15),
-                  offset: const Offset(0, 10),
-                )
-              ],
-            ),
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
 
             child: ClipRRect(
-
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(18),
 
               child: Stack(
                 children: [
 
-                  /// IMAGE
-                  CachedNetworkImage(
-                    imageUrl: image,
-                    width: double.infinity,
-                    height: double.infinity,
-                    fit: BoxFit.cover,
+                  /// 🔥 IMAGE WITH PERFECT RATIO (NO STRETCH)
+                  Positioned.fill(
+                    child: CachedNetworkImage(
+                      imageUrl: image,
 
-                    placeholder: (context, url) =>
-                        Shimmer.fromColors(
-                          baseColor: Colors.grey.shade300,
-                          highlightColor: Colors.grey.shade100,
-                          child: Container(color: Colors.white),
-                        ),
+                      /// 🔥 CORRECT RATIO FOR BANNERS
+                      memCacheWidth: 1200,
+                      memCacheHeight: 675,
 
-                    errorWidget: (context, url, error) =>
-                        const Icon(Icons.error),
+                      fit: BoxFit.cover,
+                      fadeInDuration: const Duration(milliseconds: 250),
+
+                      placeholder: (_, __) => Container(
+                        color: Colors.grey.shade200,
+                      ),
+
+                      errorWidget: (_, __, ___) =>
+                          const Icon(Icons.error),
+                    ),
                   ),
 
-                  /// GRADIENT OVERLAY
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.black.withOpacity(.7),
-                          Colors.transparent
-                        ],
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.center,
+                  /// 🔥 PREMIUM GRADIENT
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.black.withOpacity(.5),
+                            Colors.transparent,
+                          ],
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.center,
+                        ),
                       ),
                     ),
                   ),
 
-                  /// TEXT CONTENT
+                  /// 🔥 TEXT CONTENT (PREMIUM SPACING)
                   Positioned(
-                    left: 20,
-                    bottom: 22,
+                    left: 18,
+                    bottom: 18,
+                    right: 18,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
 
                         const Text(
-                          "ATHLETIC EDGE",
+                          "NEW COLLECTION",
                           style: TextStyle(
                             color: Colors.white70,
-                            fontSize: 14,
-                            letterSpacing: 1,
+                            fontSize: 12,
+                            letterSpacing: 1.2,
                           ),
                         ),
 
                         const SizedBox(height: 4),
 
                         const Text(
-                          "UNLEASHED",
+                          "UNLEASHED STYLE",
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
                           ),
                         ),
 
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
 
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
+                              horizontal: 10, vertical: 5),
 
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                           ),
 
                           child: const Text(
                             "Min 45% OFF",
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                              fontSize: 11,
                             ),
                           ),
-                        )
+                        ),
                       ],
                     ),
                   ),
@@ -488,25 +498,21 @@ activeIndex = index;
         },
       ),
 
-      const SizedBox(height: 12),
+      const SizedBox(height: 10),
 
-      /// DOT INDICATOR
+      /// 🔥 DOT INDICATOR (CLEAN + PREMIUM)
       Row(
         mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(banners.length, (index) {
 
-        children: banners.asMap().entries.map((entry) {
-
-          bool isActive = activeIndex == entry.key;
+          final isActive = activeIndex == index;
 
           return AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            margin: const EdgeInsets.symmetric(horizontal: 3),
 
-            duration: const Duration(milliseconds: 300),
-
-            margin: const EdgeInsets.symmetric(horizontal: 4),
-
-            height: 6,
-
-            width: isActive ? 18 : 6,
+            height: 5,
+            width: isActive ? 14 : 5,
 
             decoration: BoxDecoration(
               color: isActive
@@ -514,15 +520,12 @@ activeIndex = index;
                   : Colors.grey.shade400,
               borderRadius: BorderRadius.circular(20),
             ),
-
           );
-
-        }).toList(),
+        }),
       ),
     ],
   );
 }
-
 
 Widget _topStoriesSlider() {
 
@@ -576,7 +579,7 @@ Widget _topStoriesSlider() {
           viewportFraction: 0.85,
           enlargeCenterPage: true,
 
-          autoPlay: true,
+          autoPlay: false,
           autoPlayInterval: const Duration(seconds: 4),
           autoPlayAnimationDuration: const Duration(milliseconds: 800),
           autoPlayCurve: Curves.easeInOut,
@@ -588,7 +591,7 @@ Widget _topStoriesSlider() {
             borderRadius: BorderRadius.circular(20),
 
             child: CachedNetworkImage(
-              imageUrl: stories[index],
+              imageUrl: stories[index] + "&w=400",
               fit: BoxFit.cover,
               width: double.infinity,
             ),
@@ -601,13 +604,12 @@ Widget _topStoriesSlider() {
 
 Widget _miniTrendSlider() {
 
-return StreamBuilder(
-
-stream: FirebaseFirestore.instance
-.collection("products")
-.doc(TenantConfig.branchCode)
-.collection("collections")
-.snapshots(),
+return FutureBuilder(
+  future: FirebaseFirestore.instance
+      .collection("products")
+      .doc(TenantConfig.branchCode)
+      .collection("collections")
+      .get(),
 
 builder: (context, snapshot) {
 
@@ -647,16 +649,15 @@ fontWeight: FontWeight.bold,
 const SizedBox(height: 14),
 
 /// SUBCOLLECTIONS
-StreamBuilder(
-
-stream: FirebaseFirestore.instance
-.collection("products")
-.doc(TenantConfig.branchCode)
-.collection("collections")
-.doc(collectionId)
-.collection("subcollections")
-.orderBy("createdAt", descending: true)
-.snapshots(),
+FutureBuilder(
+  future: FirebaseFirestore.instance
+      .collection("products")
+      .doc(TenantConfig.branchCode)
+      .collection("collections")
+      .doc(collectionId)
+      .collection("subcollections")
+      .orderBy("createdAt", descending: true)
+      .get(),
 
 builder: (context, subSnap) {
 
@@ -674,18 +675,19 @@ return const SizedBox();
 }
 
 return _genderSlider(
-  items.map((doc) {
+  List.generate(items.length, (index) {
 
+    final doc = items[index];
     final d = doc.data();
 
     return {
       "title": d["title"] ?? "",
       "image": d["imageUrl"] ?? "",
-      "collectionId": collectionId,     // ✅ ADD THIS
-      "subcollectionId": doc.id,        // ✅ ADD THIS
+      "collectionId": collectionId,
+      "subcollectionId": doc.id,
     };
 
-  }).toList(),
+  }),
 );
 
 },
@@ -749,7 +751,7 @@ child: ListView.builder(
         children: [
 
          CachedNetworkImage(
-  imageUrl: item["image"],
+  imageUrl: item["image"] + "&w=400",
   fit: BoxFit.cover,
   width: double.infinity,
   height: double.infinity,
@@ -801,14 +803,13 @@ child: ListView.builder(
 }
 Widget _occasionCarousel(){
 
-return StreamBuilder(
-
-stream: FirebaseFirestore.instance
+return FutureBuilder(
+future: FirebaseFirestore.instance
 .collection("products")
 .doc(TenantConfig.branchCode)
 .collection("occasions")
 .orderBy("order")
-.snapshots(),
+.get(),
 
 builder:(context,snapshot){
 
@@ -875,7 +876,7 @@ options: CarouselOptions(
 height:340,
 viewportFraction:0.72,
 enlargeCenterPage:true,
-autoPlay:true
+autoPlay:false,
 ),
 
 itemBuilder:(context,index,realIndex){
@@ -938,7 +939,7 @@ child: Stack(
 children:[
 
 CachedNetworkImage(
-imageUrl:image,
+imageUrl: image + "&w=500",
 width:double.infinity,
 height:double.infinity,
 fit:BoxFit.cover
@@ -997,14 +998,13 @@ textAlign: TextAlign.center,
 }
 Widget _promotionsSlider(){
 
-return StreamBuilder(
-
-stream: FirebaseFirestore.instance
-.collection("products")
-.doc(TenantConfig.branchCode)
-.collection("promotions")
-.orderBy("order")
-.snapshots(),
+return FutureBuilder(
+  future: FirebaseFirestore.instance
+      .collection("products")
+      .doc(TenantConfig.branchCode)
+      .collection("promotions")
+      .orderBy("order")
+      .get(),
 
 builder:(context,snapshot){
 
@@ -1044,7 +1044,7 @@ options: CarouselOptions(
 height:180,
 viewportFraction:0.9,
 enlargeCenterPage:true,
-autoPlay:true
+autoPlay:false,
 ),
 
 itemBuilder:(context,index,realIndex){
@@ -1100,7 +1100,7 @@ child: Stack(
 children:[
 
 CachedNetworkImage(
-imageUrl:image,
+imageUrl: image + "&w=500",
 fit:BoxFit.cover,
 width:double.infinity,
 height:double.infinity
@@ -1264,13 +1264,12 @@ fontSize:12
   /// BENTO COLLECTION GRID
  Widget _collectionsGrid(){
 
-return StreamBuilder(
-
-stream: FirebaseFirestore.instance
-.collection("products")
-.doc(TenantConfig.branchCode)
-.collection("collections")
-.snapshots(),
+return FutureBuilder(
+  future: FirebaseFirestore.instance
+      .collection("products")
+      .doc(TenantConfig.branchCode)
+      .collection("collections")
+      .get(),
 
 builder:(context,snapshot){
 
@@ -1361,7 +1360,7 @@ GridView.builder(
         children: [
 
           CachedNetworkImage(
-            imageUrl:image,
+            imageUrl: image + "&w=500",
             width:double.infinity,
             height:double.infinity,
             fit:BoxFit.cover,
