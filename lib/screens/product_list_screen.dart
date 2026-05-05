@@ -4,6 +4,7 @@ import '../wishlist/wishlist_provider.dart';
 import 'product_detail_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/tenant_config.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 class ProductListScreen extends StatefulWidget {
   final String title;
   final String collectionKey;
@@ -16,7 +17,66 @@ class ProductListScreen extends StatefulWidget {
 
 class _ProductListScreenState extends State<ProductListScreen> {
 
- 
+ List<DocumentSnapshot> products = [];
+bool isLoading = false;
+bool hasMore = true;
+DocumentSnapshot? lastDoc;
+bool isFirstLoad = true;
+final ScrollController _scrollController = ScrollController();
+@override
+void initState() {
+  super.initState();
+
+  fetchProducts();
+
+  _scrollController.addListener(() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      fetchProducts();
+    }
+  });
+}
+
+@override
+void dispose() {
+  _scrollController.dispose();
+  super.dispose();
+}
+Future<void> fetchProducts() async {
+  if (isLoading || !hasMore) return;
+
+  setState(() => isLoading = true);
+
+  Query query = FirebaseFirestore.instance
+      .collection("products")
+      .doc(TenantConfig.branchCode)
+      .collection("products")
+      .where("collectionKeys",
+          arrayContains: widget.collectionKey)
+      .limit(20);
+
+  if (lastDoc != null) {
+    query = query.startAfterDocument(lastDoc!);
+  }
+
+  final snap = await query.get();
+
+  if (snap.docs.isNotEmpty) {
+    lastDoc = snap.docs.last;
+    products.addAll(snap.docs);
+  }
+
+  if (snap.docs.length < 20) {
+    hasMore = false;
+  }
+
+  if (mounted) {
+  setState(() {
+    isLoading = false;
+    isFirstLoad = false; // ✅ IMPORTANT
+  });
+}
+}
 
   @override
   Widget build(BuildContext context) {
@@ -99,55 +159,49 @@ class _ProductListScreenState extends State<ProductListScreen> {
       ),
 
       /// 🔥 PRODUCT GRID
-      body: StreamBuilder(
-  stream: FirebaseFirestore.instance
-      .collection("products")
-      .doc(TenantConfig.branchCode)
-      .collection("products")
-      .where(
-        "collectionKeys",
-        arrayContains: widget.collectionKey,
+      body: isFirstLoad
+    ? GridView.builder(
+        itemCount: 6,
+        gridDelegate:
+            const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+        ),
+        itemBuilder: (_, __) => Container(
+          margin: const EdgeInsets.all(8),
+          color: Colors.grey[300],
+        ),
       )
-      .snapshots(),
+    : GridView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 80),
 
-  builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+        itemCount: products.length + (hasMore ? 1 : 0),
 
-    if (snapshot.connectionState == ConnectionState.waiting) {
-      return const Center(child: CircularProgressIndicator());
-    }
+        gridDelegate:
+            const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 16,
+          childAspectRatio: 0.60,
+        ),
 
-    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-      return const Center(child: Text("No products found"));
-    }
+        itemBuilder: (context, index) {
 
-    final products = snapshot.data!.docs;
+          if (index >= products.length) {
+            return const Center(
+                child: CircularProgressIndicator());
+          }
 
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 80),
-      itemCount: products.length,
+          final doc = products[index];
+          final product =
+              Map<String, dynamic>.from(doc.data() as Map);
 
-      gridDelegate:
-          const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 16,
-        childAspectRatio: 0.60,
+          return _ProductCard(
+            product: product,
+            productId: doc.id,
+          );
+        },
       ),
-
-      itemBuilder: (context, index) {
-
-        final doc = products[index];
-        final product = Map<String, dynamic>.from(doc.data() as Map);
-
-        return _ProductCard(
-          product: product,
-          productId: doc.id, // 🔥 important
-        );
-      },
-    );
-  },
-),
-
       /// 🔥 BOTTOM BAR
       bottomNavigationBar: Container(
         height: 55,
@@ -258,43 +312,35 @@ final image = (imageList is List && imageList.isNotEmpty)
               child: Stack(
                 children: [
 
-                 ClipRRect(
+               ClipRRect(
   borderRadius: BorderRadius.circular(12),
   child: image.isNotEmpty
-      ? Image.network(
-          image,
+      ? CachedNetworkImage(
+          /// 🔥 slightly higher width to avoid blur
+          imageUrl: "$image&w=600",
+
           fit: BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
 
-          // 🔥 LOADING PLACEHOLDER
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
+          /// 🔥 smooth fade (premium feel)
+          fadeInDuration: const Duration(milliseconds: 200),
 
-            return Container(
-              color: Colors.grey[200],
-              child: const Center(
-                child: SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            );
-          },
+          /// 🔥 lightweight placeholder (no spinner jank)
+          placeholder: (_, __) => Container(
+            color: Colors.grey[200],
+          ),
 
-          // 🔥 ERROR FALLBACK
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              color: Colors.grey[200],
-              child: const Center(
-                child: Icon(
-                  Icons.image_not_supported,
-                  color: Colors.grey,
-                ),
+          /// 🔥 error fallback
+          errorWidget: (_, __, ___) => Container(
+            color: Colors.grey[200],
+            child: const Center(
+              child: Icon(
+                Icons.image_not_supported,
+                color: Colors.grey,
               ),
-            );
-          },
+            ),
+          ),
         )
       : Container(
           color: Colors.grey[200],
@@ -306,7 +352,6 @@ final image = (imageList is List && imageList.isNotEmpty)
           ),
         ),
 ),
-
                   /// ⭐ RATING
                   Positioned(
                     left: 6,
