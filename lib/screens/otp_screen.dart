@@ -11,6 +11,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'city_selection_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/home_provider.dart'; 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/tenant_config.dart';
+import '../widgets/reward_popup.dart';
 class OtpScreen extends StatefulWidget {
   final AuthService authService;
 
@@ -58,9 +62,19 @@ class _OtpScreenState extends State<OtpScreen>
       },
     );
   }
+  String normalizePhone(String phone) {
+  // remove everything except digits
+  String cleaned = phone.replaceAll(RegExp(r'[^0-9]'), '');
+
+  // remove country code (India)
+  if (cleaned.startsWith("91") && cleaned.length > 10) {
+    cleaned = cleaned.substring(cleaned.length - 10);
+  }
+
+  return cleaned;
+}
 
 void verifyOtp() async {
-
   if (otpCode.length < 6) {
     shakeController.forward(from: 0);
     return;
@@ -70,14 +84,156 @@ void verifyOtp() async {
     loading = true;
   });
 
-  try {
+  /// 🔥 POPUP FLAGS
+  bool showRewardPopup = false;
+  int rewardAmount = 0;
 
+  try {
     /// 🔥 STEP 1: VERIFY OTP
     await widget.authService.verifyOtp(otpCode);
 
+    final user = FirebaseAuth.instance.currentUser;
+    final phoneRaw = user?.phoneNumber;
+
+    final phone =
+        phoneRaw != null ? normalizePhone(phoneRaw) : null;
+
+    final branch = TenantConfig.branchCode;
+
+    if (phone != null) {
+      const int welcomeReward = 100;
+
+      final userRef = FirebaseFirestore.instance
+          .collection("customers")
+          .doc(branch)
+          .collection("users")
+          .doc(phone);
+
+      final userSnap = await userRef.get();
+
+      /// 🆕 NEW USER
+      if (!userSnap.exists) {
+        await userRef.set({
+          "phone": phone,
+          "name": "",
+          "branch": branch,
+          "createdAt": FieldValue.serverTimestamp(),
+          "firstLogin": FieldValue.serverTimestamp(),
+          "creditBalance": welcomeReward,
+          "rewardGiven": true,
+        });
+
+        print("🆕 New user + reward: $phone");
+
+        /// 🎁 FLAG POPUP
+        showRewardPopup = true;
+        rewardAmount = welcomeReward;
+
+        /// 🔥 CREATE CREDIT NOTE
+        await FirebaseFirestore.instance
+            .collection("products")
+            .doc(branch)
+            .collection("creditNotes")
+            .add({
+          "Name": "Customer",
+          "mobileNumber": phone,
+          "amount": welcomeReward,
+          "CreditUsed": 0,
+          "Balance": welcomeReward,
+          "Comment": "App Signup Reward 🎉",
+          "status": "active",
+          "source": "app_signup",
+          "createdAt": FieldValue.serverTimestamp(),
+          "createdBy": "app",
+        });
+      }
+
+      /// 🔁 EXISTING USER
+      else {
+        final data = userSnap.data();
+
+        final rewardGiven = data?["rewardGiven"] == true;
+
+        /// 🎁 FIRST LOGIN (MIGRATED USER)
+        if (!rewardGiven) {
+          await userRef.set({
+            "firstLogin": FieldValue.serverTimestamp(),
+            "creditBalance":
+                FieldValue.increment(welcomeReward),
+            "rewardGiven": true,
+          }, SetOptions(merge: true));
+
+          print("🎁 Reward added: $phone");
+
+          /// 🎁 FLAG POPUP
+          showRewardPopup = true;
+          rewardAmount = welcomeReward;
+
+          /// 🔥 CHECK CREDIT NOTE
+          final creditQuery = await FirebaseFirestore
+              .instance
+              .collection("products")
+              .doc(branch)
+              .collection("creditNotes")
+              .where("mobileNumber", isEqualTo: phone)
+              .limit(1)
+              .get();
+
+          if (creditQuery.docs.isNotEmpty) {
+            final docRef = creditQuery.docs.first.reference;
+            final existing = creditQuery.docs.first.data();
+
+            final newAmount =
+                (existing["amount"] ?? 0) + welcomeReward;
+            final newBalance =
+                (existing["Balance"] ?? 0) + welcomeReward;
+
+            await docRef.update({
+              "amount": newAmount,
+              "Balance": newBalance,
+              "Comment":
+                  "Updated: App Signup Reward 🎉",
+              "updatedAt":
+                  FieldValue.serverTimestamp(),
+            });
+
+            print("🔄 Credit note updated");
+          } else {
+            await FirebaseFirestore.instance
+                .collection("products")
+                .doc(branch)
+                .collection("creditNotes")
+                .add({
+              "Name": data?["name"] ?? "Customer",
+              "mobileNumber": phone,
+              "amount": welcomeReward,
+              "CreditUsed": 0,
+              "Balance": welcomeReward,
+              "Comment": "App Signup Reward 🎉",
+              "status": "active",
+              "source": "app_signup",
+              "createdAt": FieldValue.serverTimestamp(),
+              "createdBy": "app",
+            });
+
+            print("🆕 Credit note created");
+          }
+        }
+
+        /// 🔁 NORMAL LOGIN
+        else {
+          await userRef.set({
+            "lastLogin": FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+
+          print("✅ Returning user login");
+        }
+      }
+    }
+
     if (!mounted) return;
 
-    /// 🔥 STEP 2: LOAD HOME DATA (NO Future.wait needed)
+    /// 🔥 LOAD HOME DATA
     final homeProvider =
         Provider.of<HomeProvider>(context, listen: false);
 
@@ -85,7 +241,7 @@ void verifyOtp() async {
 
     if (!mounted) return;
 
-    /// 🔥 STEP 3: NAVIGATE (clean replace)
+    /// 🔥 NAVIGATE
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
@@ -94,8 +250,18 @@ void verifyOtp() async {
       (route) => false,
     );
 
-  } catch (e) {
+    /// 🎉 SHOW REWARD POPUP
+    if (showRewardPopup) {
+      Future.delayed(const Duration(milliseconds: 400), () {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => RewardPopup(amount: rewardAmount),
+        );
+      });
+    }
 
+  } catch (e) {
     if (!mounted) return;
 
     shakeController.forward(from: 0);
@@ -103,10 +269,7 @@ void verifyOtp() async {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Invalid OTP")),
     );
-
   } finally {
-
-    /// 🔥 ALWAYS RESET LOADING
     if (mounted) {
       setState(() {
         loading = false;

@@ -349,8 +349,7 @@ Widget _heroSlider() {
                   Positioned.fill(
                     child: CachedNetworkImage(
                       imageUrl: image,
-                      memCacheWidth: 1200,
-                      memCacheHeight: 675,
+                      
                       fit: BoxFit.cover,
                     ),
                   ),

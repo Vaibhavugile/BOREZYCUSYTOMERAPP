@@ -1,19 +1,30 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../services/tenant_config.dart';
 
 class WishlistService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  String? get userId => _auth.currentUser?.uid;
+  String? get userId {
+  final phone = _auth.currentUser?.phoneNumber;
+  if (phone == null) return null;
+
+  /// 🔥 convert +91 9988636521 → 9988636521
+  return phone.replaceAll(RegExp(r'[^0-9]'), '');
+}
 
   /// 🔥 COLLECTION REFERENCE (clean + reusable)
-  CollectionReference<Map<String, dynamic>> _wishlistRef() {
-    return _firestore
-        .collection("customers")
-        .doc(userId)
-        .collection("wishlist");
-  }
+ CollectionReference<Map<String, dynamic>> _wishlistRef() {
+  final branch = TenantConfig.branchCode;
+
+  return _firestore
+      .collection("customers")
+      .doc(branch)
+      .collection("users")
+      .doc(userId)
+      .collection("wishlist");
+}
 
   /// 🔥 ADD TO WISHLIST (USING PRODUCT ID)
   Future<void> addToWishlist({

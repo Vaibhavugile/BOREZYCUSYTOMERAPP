@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'wishlist_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/tenant_config.dart';
+
 
 class WishlistProvider extends ChangeNotifier {
   final WishlistService _service = WishlistService();

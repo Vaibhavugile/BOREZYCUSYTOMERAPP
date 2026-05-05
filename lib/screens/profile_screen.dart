@@ -27,13 +27,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     loadProfileData();
   }
 
-  Future<void> loadProfileData() async {
+ Future<void> loadProfileData() async {
 
   final phone = FirebaseAuth.instance.currentUser!.phoneNumber!;
   final cleanPhone = phone.replaceAll("+91", "");
 
+  final branch = TenantConfig.branchCode;
+
   final customerDoc = await FirebaseFirestore.instance
       .collection("customers")
+      .doc(branch)
+      .collection("users")
       .doc(cleanPhone)
       .get();
 
@@ -46,12 +50,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final branchStats = data["branchStats"] ?? {};
 
     final currentBranchStats =
-        branchStats[TenantConfig.branchCode] ?? {};
+        branchStats[branch] ?? {};
 
     rentals = currentBranchStats["receipts"] ?? 0;
 
     points = (currentBranchStats["creditBalance"] ?? 0).toInt();
-
   }
 
   setState(() {
