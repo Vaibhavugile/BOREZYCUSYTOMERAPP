@@ -9,6 +9,9 @@ import 'product_list_screen.dart';
 import 'package:provider/provider.dart';
 import '../wishlist/wishlist_provider.dart';
 import '../providers/home_provider.dart'; // ✅ ADDED
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'wishlist_screen.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -116,69 +119,179 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// 🔥 TOP BAR
-  Widget _topBar() {
-    return SliverAppBar(
-      floating: true,
-      elevation: 0,
-      backgroundColor: Colors.white,
-      toolbarHeight: 70,
+ Widget _topBar() {
+  return SliverAppBar(
+    floating: true,
+    elevation: 0,
+    backgroundColor: Colors.white,
+    toolbarHeight: 70,
 
-      title: Row(
-        children: [
+    title: Row(
+      children: [
 
-          Text(
-            TenantConfig.appName,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 22,
-              letterSpacing: 1.5,
-              color: Colors.black,
+        /// 🏷 APP NAME
+        Text(
+          TenantConfig.appName,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+            letterSpacing: 1.5,
+            color: Colors.black,
+          ),
+        ),
+
+        const Spacer(),
+
+        /// 🔔 NOTIFICATION
+        Stack(
+          children: [
+            const Icon(Icons.notifications_none, size: 26),
+
+            Positioned(
+              right: 0,
+              top: 0,
+              child: Container(
+                height: 8,
+                width: 8,
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+              ),
             ),
-          ),
+          ],
+        ),
 
-          const Spacer(),
+        const SizedBox(width: 12),
 
-          const Icon(Icons.notifications_none, size: 26),
+        /// 💰 WALLET (LIVE FROM FIRESTORE)
+        GestureDetector(
+          onTap: () {
+            // 👉 Navigate to wallet screen later
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F5F7),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.black12),
+            ),
+            child: Row(
+              children: [
 
-          const SizedBox(width: 15),
+                const Icon(
+                  Icons.account_balance_wallet_outlined,
+                  size: 16,
+                  color: Colors.black,
+                ),
 
-          Consumer<WishlistProvider>(
-            builder: (context, wishlist, _) {
-              final count = wishlist.wishlistIds.length;
+                const SizedBox(width: 6),
 
-              return Stack(
-                children: [
-                  const Icon(Icons.favorite_border, size: 26),
-                  if (count > 0)
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          count.toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 8,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
+                /// 🔥 REAL WALLET VALUE
+               StreamBuilder<DocumentSnapshot>(
+  stream: FirebaseFirestore.instance
+      .collection("customers")
+      .doc(TenantConfig.branchCode)
+      .collection("users")
+      .doc(
+        FirebaseAuth.instance.currentUser?.phoneNumber
+            ?.replaceAll('+91', ''), // ✅ FIX
+      )
+      .snapshots(),
+  builder: (context, snapshot) {
 
-          const SizedBox(width: 15),
-          const Icon(Icons.person_outline),
-        ],
+    int wallet = 0;
+
+    if (snapshot.hasData &&
+        snapshot.data != null &&
+        snapshot.data!.exists) {
+
+      final data =
+          snapshot.data!.data() as Map<String, dynamic>;
+
+      wallet = data["creditBalance"] ?? 0;
+    }
+
+    return Text(
+      "₹$wallet",
+      style: const TextStyle(
+        fontWeight: FontWeight.bold,
+        fontSize: 13,
       ),
     );
-  }
+  },
+),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 12),
+
+        /// ❤️ WISHLIST
+        GestureDetector(
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const WishlistScreen(),
+      ),
+    );
+  },
+  child: Consumer<WishlistProvider>(
+    builder: (context, wishlist, _) {
+      final count = wishlist.wishlistIds.length;
+
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+
+          /// ❤️ ICON
+          const Icon(Icons.favorite_border, size: 26),
+
+          /// 🔴 BADGE
+          if (count > 0)
+            Positioned(
+              right: -4,
+              top: -4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 5,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                constraints: const BoxConstraints(
+                  minWidth: 16,
+                  minHeight: 16,
+                ),
+                child: Text(
+                  count > 99 ? "99+" : count.toString(),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    },
+  ),
+),
+        const SizedBox(width: 12),
+
+        /// 👤 PROFILE
+
+      ],
+    ),
+  );
+}
   Widget _searchBar(){
 
 return Padding(
@@ -909,11 +1022,12 @@ Widget _promotionCard(
           itemBuilder: (context, index) {
 
             final data = collections[index].data() as Map<String, dynamic>;
-
-            return _collectionCard(
-              data["title"] ?? "",
-              data["imageUrl"] ?? "",
-            );
+final doc = collections[index];
+           return _collectionCard(
+  data["title"] ?? "",
+  data["imageUrl"] ?? "",
+  doc.id,
+);
           },
         ),
       ],
@@ -921,64 +1035,65 @@ Widget _promotionCard(
   );
 }
   /// GLASSMORPHISM COLLECTION CARD
- Widget _collectionCard(String title, String image) {
-
-  return ClipRRect(
-    borderRadius: BorderRadius.circular(24),
-
-    child: Stack(
-      children: [
-
-        /// 🔥 optimized image
-        CachedNetworkImage(
-          imageUrl: image,
-         
-          width: double.infinity,
-          height: double.infinity,
-          fit: BoxFit.cover,
-        ),
-
-        /// gradient overlay
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.transparent,
-                Colors.black.withOpacity(.65),
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+Widget _collectionCard(String title, String image, String collectionId) {
+  return GestureDetector(
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProductListScreen(
+            title: title,
+            collectionKey: collectionId, // ✅ PASS ID
           ),
         ),
-
-        /// title
-        Positioned(
-          bottom: 14,
-          left: 14,
-
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 6,
-            ),
-
+      );
+    },
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: Stack(
+        children: [
+          CachedNetworkImage(
+            imageUrl: image,
+            width: double.infinity,
+            height: double.infinity,
+            fit: BoxFit.cover,
+          ),
+          Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(.2),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Colors.white30),
-            ),
-
-            child: Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withOpacity(.65),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
               ),
             ),
           ),
-        ),
-      ],
+          Positioned(
+            bottom: 14,
+            left: 14,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(.2),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white30),
+              ),
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }

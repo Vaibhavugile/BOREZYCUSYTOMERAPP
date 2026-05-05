@@ -5,7 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_gradients.dart';
 import '../services/tenant_config.dart';
-
+import 'booking_list_screen.dart';
+import 'wishlist_screen.dart';
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -63,28 +64,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
 }
 
   Widget buildMenuItem({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    Color iconColor = AppColors.primary,
-  }) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.primaryLight,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Icon(icon, color: iconColor),
+  required IconData icon,
+  required String title,
+  required String subtitle,
+  VoidCallback? onTap, // ✅ ADD THIS
+  Color iconColor = AppColors.primary,
+}) {
+  return ListTile(
+    onTap: onTap, // ✅ ADD THIS
+    leading: Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight,
+        borderRadius: BorderRadius.circular(14),
       ),
-      title: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.w600),
-      ),
-      subtitle: Text(subtitle),
-      trailing: const Icon(Icons.chevron_right),
-    );
-  }
+      child: Icon(icon, color: iconColor),
+    ),
+    title: Text(
+      title,
+      style: const TextStyle(fontWeight: FontWeight.w600),
+    ),
+    subtitle: Text(subtitle),
+    trailing: const Icon(Icons.chevron_right),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -276,40 +279,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 borderRadius: BorderRadius.circular(20),
               ),
 
-              child: Column(
-                children: [
+             child: Column(
+  children: [
 
-                  buildMenuItem(
-                    icon: Icons.straighten,
-                    title: "My Measurements",
-                    subtitle: "Manage your fit preferences",
-                  ),
+    /// 📦 BOOKINGS
+    buildMenuItem(
+      icon: Icons.calendar_today,
+      title: "My Bookings",
+      subtitle: "History and upcoming rentals",
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const BookingListScreen(),
+          ),
+        );
+      },
+    ),
 
-                  const Divider(),
+    const Divider(),
 
-                  buildMenuItem(
-                    icon: Icons.location_on_outlined,
-                    title: "Addresses",
-                    subtitle: "Manage your shipping locations",
-                  ),
-
-                  const Divider(),
-
-                  buildMenuItem(
-                    icon: Icons.calendar_today,
-                    title: "My Bookings",
-                    subtitle: "History and upcoming rentals",
-                  ),
-
-                  const Divider(),
-
-                  buildMenuItem(
-                    icon: Icons.favorite_border,
-                    title: "Wishlist",
-                    subtitle: "Items you've saved for later",
-                  ),
-                ],
-              ),
+    /// ❤️ WISHLIST
+    buildMenuItem(
+      icon: Icons.favorite_border,
+      title: "Wishlist",
+      subtitle: "Items you've saved for later",
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const WishlistScreen(),
+          ),
+        );
+      },
+    ),
+  ],
+),
             ),
 
             const SizedBox(height: 25),

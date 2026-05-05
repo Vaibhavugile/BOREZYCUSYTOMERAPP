@@ -5,6 +5,9 @@ import 'product_detail_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/tenant_config.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../providers/home_provider.dart';
+import 'wishlist_screen.dart';
+
 class ProductListScreen extends StatefulWidget {
   final String title;
   final String collectionKey;
@@ -47,13 +50,30 @@ Future<void> fetchProducts() async {
 
   setState(() => isLoading = true);
 
-  Query query = FirebaseFirestore.instance
-      .collection("products")
-      .doc(TenantConfig.branchCode)
-      .collection("products")
-      .where("collectionKeys",
-          arrayContains: widget.collectionKey)
-      .limit(20);
+  final home = Provider.of<HomeProvider>(context, listen: false);
+
+/// ✅ get all subcollections of this collection (men/women)
+final subs = home.subCollections
+    .where((e) => e["collectionId"] == widget.collectionKey)
+    .toList();
+
+/// ✅ create keys like men_shirts, men_tshirts
+final keys = subs
+    .map((e) => "${e["collectionId"]}_${e["id"]}")
+    .toList();
+
+/// 🚨 fallback (if no subcollections found)
+if (keys.isEmpty) {
+  keys.add(widget.collectionKey);
+}
+
+/// 🔥 FIRESTORE QUERY
+Query query = FirebaseFirestore.instance
+    .collection("products")
+    .doc(TenantConfig.branchCode)
+    .collection("products")
+    .where("collectionKeys", arrayContainsAny: keys)
+    .limit(20);
 
   if (lastDoc != null) {
     query = query.startAfterDocument(lastDoc!);
@@ -111,36 +131,50 @@ Future<void> fetchProducts() async {
   const SizedBox(width: 16),
 
   /// 🔥 WISHLIST WITH COUNT
-  Consumer<WishlistProvider>(
+  GestureDetector(
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const WishlistScreen(),
+      ),
+    );
+  },
+  child: Consumer<WishlistProvider>(
     builder: (context, wishlist, _) {
-
       final count = wishlist.wishlistIds.length;
 
       return Stack(
+        clipBehavior: Clip.none,
         children: [
 
-          const Icon(
-            Icons.favorite_border,
-            color: Colors.black,
-            size: 26,
-          ),
+          /// ❤️ ICON
+          const Icon(Icons.favorite_border, size: 26),
 
-          /// 🔴 COUNT BADGE
+          /// 🔴 BADGE
           if (count > 0)
             Positioned(
-              right: 0,
-              top: 0,
+              right: -4,
+              top: -4,
               child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 5,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
                   color: Colors.red,
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                constraints: const BoxConstraints(
+                  minWidth: 16,
+                  minHeight: 16,
                 ),
                 child: Text(
-                  count.toString(),
+                  count > 99 ? "99+" : count.toString(),
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 8,
+                    fontSize: 9,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -150,6 +184,7 @@ Future<void> fetchProducts() async {
       );
     },
   ),
+),
 
   const SizedBox(width: 16),
 
