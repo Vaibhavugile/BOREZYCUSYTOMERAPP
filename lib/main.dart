@@ -6,6 +6,7 @@ import 'screens/login_screen.dart';
 import 'services/tenant_config.dart';
 import 'package:provider/provider.dart';
 import 'wishlist/wishlist_provider.dart';
+import 'providers/home_provider.dart';
 void main() async {
 
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,10 +16,20 @@ void main() async {
   );
    await TenantConfig.load();
 
-  runApp(
+ runApp(
   MultiProvider(
     providers: [
-      ChangeNotifierProvider(create: (_) => WishlistProvider()),
+
+      /// 🔥 HOME DATA
+      ChangeNotifierProvider(
+        create: (_) => HomeProvider(),
+      ),
+
+      /// 🔥 WISHLIST (you already made)
+      ChangeNotifierProvider(
+        create: (_) => WishlistProvider(),
+      ),
+
     ],
     child: const MyApp(),
   ),

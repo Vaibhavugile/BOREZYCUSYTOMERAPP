@@ -9,6 +9,8 @@ import 'home_screen.dart';
 import 'main_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'city_selection_screen.dart';
+import 'package:provider/provider.dart';
+import '../providers/home_provider.dart'; 
 class OtpScreen extends StatefulWidget {
   final AuthService authService;
 
@@ -57,7 +59,7 @@ class _OtpScreenState extends State<OtpScreen>
     );
   }
 
- void verifyOtp() async {
+void verifyOtp() async {
 
   if (otpCode.length < 6) {
     shakeController.forward(from: 0);
@@ -70,36 +72,31 @@ class _OtpScreenState extends State<OtpScreen>
 
   try {
 
+    /// 🔥 STEP 1: VERIFY OTP
     await widget.authService.verifyOtp(otpCode);
-
-    final prefs = await SharedPreferences.getInstance();
-    String? city = prefs.getString("selectedCity");
 
     if (!mounted) return;
 
-    if (city == null) {
+    /// 🔥 STEP 2: LOAD HOME DATA (NO Future.wait needed)
+    final homeProvider =
+        Provider.of<HomeProvider>(context, listen: false);
 
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const CitySelectionScreen(),
-        ),
-        (route) => false,
-      );
+    await homeProvider.loadHomeData();
 
-    } else {
+    if (!mounted) return;
 
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const MainScreen(),
-        ),
-        (route) => false,
-      );
-
-    }
+    /// 🔥 STEP 3: NAVIGATE (clean replace)
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const MainScreen(),
+      ),
+      (route) => false,
+    );
 
   } catch (e) {
+
+    if (!mounted) return;
 
     shakeController.forward(from: 0);
 
@@ -107,12 +104,14 @@ class _OtpScreenState extends State<OtpScreen>
       const SnackBar(content: Text("Invalid OTP")),
     );
 
-  }
+  } finally {
 
-  if (mounted) {
-    setState(() {
-      loading = false;
-    });
+    /// 🔥 ALWAYS RESET LOADING
+    if (mounted) {
+      setState(() {
+        loading = false;
+      });
+    }
   }
 }
 
