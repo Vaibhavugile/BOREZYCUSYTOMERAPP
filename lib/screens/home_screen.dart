@@ -12,6 +12,7 @@ import '../providers/home_provider.dart'; // ✅ ADDED
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'wishlist_screen.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -24,24 +25,39 @@ class _HomeScreenState extends State<HomeScreen> {
   bool loadRest = false;
 
   @override
-  void initState() {
-    super.initState();
+void initState() {
+  super.initState();
 
-    /// Wishlist init
-    Future.microtask(() {
-      Provider.of<WishlistProvider>(context, listen: false)
-          .initWishlist();
-    });
+  /// Wishlist init
+  Future.microtask(() {
+    Provider.of<WishlistProvider>(context, listen: false)
+        .initWishlist();
+  });
 
-    /// Lazy load rest
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) {
-        setState(() {
-          loadRest = true;
-        });
-      }
-    });
-  }
+  /// 🔔 FOREGROUND NOTIFICATION
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+
+    final title = message.notification?.title ?? "";
+    final body = message.notification?.body ?? "";
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("$title\n$body"),
+      ),
+    );
+  });
+
+  /// Lazy load rest
+  Future.delayed(const Duration(milliseconds: 300), () {
+    if (mounted) {
+      setState(() {
+        loadRest = true;
+      });
+    }
+  });
+}
 
   int activeIndex = 0;
   final CarouselSliderController carouselController = CarouselSliderController();

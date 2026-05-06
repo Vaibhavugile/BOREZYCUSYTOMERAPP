@@ -7,34 +7,42 @@ import 'services/tenant_config.dart';
 import 'package:provider/provider.dart';
 import 'wishlist/wishlist_provider.dart';
 import 'providers/home_provider.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print("🔔 Background message: ${message.messageId}");
+}
 void main() async {
-
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-   await TenantConfig.load();
 
- runApp(
-  MultiProvider(
-    providers: [
+  /// 🔥 INIT BACKGROUND HANDLER
+  FirebaseMessaging.onBackgroundMessage(
+      _firebaseMessagingBackgroundHandler);
 
-      /// 🔥 HOME DATA
-      ChangeNotifierProvider(
-        create: (_) => HomeProvider(),
-      ),
+  await TenantConfig.load();
 
-      /// 🔥 WISHLIST (you already made)
-      ChangeNotifierProvider(
-        create: (_) => WishlistProvider(),
-      ),
+  runApp(
+    MultiProvider(
+      providers: [
 
-    ],
-    child: const MyApp(),
-  ),
-);
+        /// 🔥 HOME DATA
+        ChangeNotifierProvider(
+          create: (_) => HomeProvider(),
+        ),
 
+        /// 🔥 WISHLIST
+        ChangeNotifierProvider(
+          create: (_) => WishlistProvider(),
+        ),
+
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {

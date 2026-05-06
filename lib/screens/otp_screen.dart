@@ -15,6 +15,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/tenant_config.dart';
 import '../widgets/reward_popup.dart';
+import '../services/fcm_service.dart';
 class OtpScreen extends StatefulWidget {
   final AuthService authService;
 
@@ -232,6 +233,7 @@ void verifyOtp() async {
     }
 
     if (!mounted) return;
+    await FCMService.setupFCM();
 
     /// 🔥 LOAD HOME DATA
     final homeProvider =
