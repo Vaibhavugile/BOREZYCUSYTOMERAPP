@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'wishlist/wishlist_provider.dart';
 import 'providers/home_provider.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import '../services/user_helper.dart';
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   print("🔔 Background message: ${message.messageId}");

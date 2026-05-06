@@ -7,6 +7,7 @@ import '../theme/app_gradients.dart';
 import '../services/tenant_config.dart';
 import 'booking_list_screen.dart';
 import 'wishlist_screen.dart';
+import '../services/user_helper.dart';
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -28,10 +29,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     loadProfileData();
   }
 
- Future<void> loadProfileData() async {
+Future<void> loadProfileData() async {
 
-  final phone = FirebaseAuth.instance.currentUser!.phoneNumber!;
-  final cleanPhone = phone.replaceAll("+91", "");
+  final cleanPhone = await UserHelper.getPhone();
+  if (cleanPhone == null) return;
 
   final branch = TenantConfig.branchCode;
 
@@ -49,12 +50,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     customerName = data["name"] ?? "Customer";
 
     final branchStats = data["branchStats"] ?? {};
-
-    final currentBranchStats =
-        branchStats[branch] ?? {};
+    final currentBranchStats = branchStats[branch] ?? {};
 
     rentals = currentBranchStats["receipts"] ?? 0;
-
     points = (currentBranchStats["creditBalance"] ?? 0).toInt();
   }
 

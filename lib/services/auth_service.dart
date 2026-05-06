@@ -1,40 +1,92 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:convert';
+import 'dart:math';
+import 'package:http/http.dart' as http;
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  String? verificationId;
+  String? _currentOtp;
+  String? _currentPhone;
 
+  /// 🔢 GENERATE OTP
+  String _generateOtp() {
+    final random = Random();
+    return (100000 + random.nextInt(900000)).toString();
+  }
+
+  /// 📤 SEND OTP VIA MSG91 WHATSAPP
   Future<void> sendOtp({
     required String phone,
     required Function() codeSent,
   }) async {
-    await _auth.verifyPhoneNumber(
-      phoneNumber: "+91$phone",
-      verificationCompleted: (PhoneAuthCredential credential) async {
-        await _auth.signInWithCredential(credential);
-      },
-      verificationFailed: (FirebaseAuthException e) {
-        print("Verification Failed: ${e.message}");
-      },
-      codeSent: (String verId, int? resendToken) {
-        verificationId = verId;
-        codeSent();
-      },
-      codeAutoRetrievalTimeout: (String verId) {
-        verificationId = verId;
-      },
-    );
-  }
 
-  Future<void> verifyOtp(String otp) async {
-    PhoneAuthCredential credential = PhoneAuthProvider.credential(
-      verificationId: verificationId!,
-      smsCode: otp,
+    final otp = _generateOtp();
+
+    /// 🔐 STORE TEMP (basic version)
+    _currentOtp = otp;
+    _currentPhone = phone;
+
+    final url = Uri.parse(
+      "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
     );
 
-    await _auth.signInWithCredential(credential);
+    final body = {
+      "integrated_number": "919096457700", // your MSG91 number
+      "content_type": "template",
+      "payload": {
+        "messaging_product": "whatsapp",
+        "type": "template",
+        "template": {
+          "name": "otp_login",
+          "language": {
+            "code": "en",
+            "policy": "deterministic"
+          },
+          "namespace": "4ffa31a1_ffeb_487b_9817_7ab865d7addf",
+          "to_and_components": [
+            {
+              "to": ["91$phone"], // user number
+              "components": {
+  "body_1": {
+    "type": "text",
+    "value": otp
+  },
+  "button_1": {
+    "subtype": "url",
+    "type": "text",
+    "value": otp // 🔥 SAME OTP HERE
+  }
+}
+            }
+          ]
+        }
+      }
+    };
+
+    final response = await http.post(
+      url,
+      headers: {
+        "Content-Type": "application/json",
+        "authkey": "499846AoYOdUNzyF69fb27a5P1", // 🔐 replace
+      },
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode == 200) {
+      print("✅ OTP Sent: $otp"); // debug only
+      codeSent();
+    } else {
+      print("❌ MSG91 Error: ${response.body}");
+      throw Exception("Failed to send OTP");
+    }
   }
 
-  User? get currentUser => _auth.currentUser;
+  /// 🔍 VERIFY OTP (MANUAL)
+  Future<void> verifyOtp(String phone, String otp) async {
+    if (_currentPhone == phone && _currentOtp == otp) {
+      print("✅ OTP Verified");
+      return;
+    } else {
+      throw Exception("Invalid OTP");
+    }
+  }
 }

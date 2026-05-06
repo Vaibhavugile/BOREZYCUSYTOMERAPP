@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pinput/pinput.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_gradients.dart';
@@ -12,14 +12,19 @@ import 'city_selection_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/home_provider.dart'; 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../services/tenant_config.dart';
 import '../widgets/reward_popup.dart';
 import '../services/fcm_service.dart';
+import '../services/user_helper.dart';
 class OtpScreen extends StatefulWidget {
   final AuthService authService;
+  final String phone; // ✅ ADD THIS
 
-  const OtpScreen({super.key, required this.authService});
+  const OtpScreen({
+    super.key,
+    required this.authService,
+    required this.phone, // ✅ ADD THIS
+  });
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -85,160 +90,141 @@ void verifyOtp() async {
     loading = true;
   });
 
-  /// 🔥 POPUP FLAGS
   bool showRewardPopup = false;
   int rewardAmount = 0;
 
   try {
     /// 🔥 STEP 1: VERIFY OTP
-    await widget.authService.verifyOtp(otpCode);
+    await widget.authService.verifyOtp(widget.phone, otpCode);
 
-    final user = FirebaseAuth.instance.currentUser;
-    final phoneRaw = user?.phoneNumber;
+    /// 🔥 STEP 2: NORMALIZE PHONE
+    final phone = normalizePhone(widget.phone);
 
-    final phone =
-        phoneRaw != null ? normalizePhone(phoneRaw) : null;
+    /// 🔥 STEP 3: FIREBASE AUTH (for rules)
+    await FirebaseAuth.instance.signInAnonymously();
+
+    /// 🔥 STEP 4: SAVE PHONE (UPDATED)
+    await UserHelper.setPhone(phone);
 
     final branch = TenantConfig.branchCode;
+    const int welcomeReward = 100;
 
-    if (phone != null) {
-      const int welcomeReward = 100;
+    final userRef = FirebaseFirestore.instance
+        .collection("customers")
+        .doc(branch)
+        .collection("users")
+        .doc(phone);
 
-      final userRef = FirebaseFirestore.instance
-          .collection("customers")
+    final userSnap = await userRef.get();
+
+    /// 🆕 NEW USER
+    if (!userSnap.exists) {
+      await userRef.set({
+        "phone": phone,
+        "name": "",
+        "branch": branch,
+        "createdAt": FieldValue.serverTimestamp(),
+        "firstLogin": FieldValue.serverTimestamp(),
+        "creditBalance": welcomeReward,
+        "rewardGiven": true,
+      });
+
+      showRewardPopup = true;
+      rewardAmount = welcomeReward;
+
+      /// 🔥 CREATE CREDIT NOTE
+      await FirebaseFirestore.instance
+          .collection("products")
           .doc(branch)
-          .collection("users")
-          .doc(phone);
+          .collection("creditNotes")
+          .add({
+        "Name": "Customer",
+        "mobileNumber": phone,
+        "amount": welcomeReward,
+        "CreditUsed": 0,
+        "Balance": welcomeReward,
+        "Comment": "App Signup Reward 🎉",
+        "status": "active",
+        "source": "app_signup",
+        "createdAt": FieldValue.serverTimestamp(),
+        "createdBy": "app",
+      });
+    }
 
-      final userSnap = await userRef.get();
+    /// 🔁 EXISTING USER
+    else {
+      final data = userSnap.data();
+      final rewardGiven = data?["rewardGiven"] == true;
 
-      /// 🆕 NEW USER
-      if (!userSnap.exists) {
+      /// 🎁 FIRST LOGIN (MIGRATED USER)
+      if (!rewardGiven) {
         await userRef.set({
-          "phone": phone,
-          "name": "",
-          "branch": branch,
-          "createdAt": FieldValue.serverTimestamp(),
           "firstLogin": FieldValue.serverTimestamp(),
-          "creditBalance": welcomeReward,
+          "creditBalance": FieldValue.increment(welcomeReward),
           "rewardGiven": true,
-        });
+        }, SetOptions(merge: true));
 
-        print("🆕 New user + reward: $phone");
-
-        /// 🎁 FLAG POPUP
         showRewardPopup = true;
         rewardAmount = welcomeReward;
 
-        /// 🔥 CREATE CREDIT NOTE
-        await FirebaseFirestore.instance
+        /// 🔥 CHECK CREDIT NOTE
+        final creditQuery = await FirebaseFirestore.instance
             .collection("products")
             .doc(branch)
             .collection("creditNotes")
-            .add({
-          "Name": "Customer",
-          "mobileNumber": phone,
-          "amount": welcomeReward,
-          "CreditUsed": 0,
-          "Balance": welcomeReward,
-          "Comment": "App Signup Reward 🎉",
-          "status": "active",
-          "source": "app_signup",
-          "createdAt": FieldValue.serverTimestamp(),
-          "createdBy": "app",
-        });
-      }
+            .where("mobileNumber", isEqualTo: phone)
+            .limit(1)
+            .get();
 
-      /// 🔁 EXISTING USER
-      else {
-        final data = userSnap.data();
+        if (creditQuery.docs.isNotEmpty) {
+          final docRef = creditQuery.docs.first.reference;
+          final existing = creditQuery.docs.first.data();
 
-        final rewardGiven = data?["rewardGiven"] == true;
+          final newAmount = (existing["amount"] ?? 0) + welcomeReward;
+          final newBalance = (existing["Balance"] ?? 0) + welcomeReward;
 
-        /// 🎁 FIRST LOGIN (MIGRATED USER)
-        if (!rewardGiven) {
-          await userRef.set({
-            "firstLogin": FieldValue.serverTimestamp(),
-            "creditBalance":
-                FieldValue.increment(welcomeReward),
-            "rewardGiven": true,
-          }, SetOptions(merge: true));
-
-          print("🎁 Reward added: $phone");
-
-          /// 🎁 FLAG POPUP
-          showRewardPopup = true;
-          rewardAmount = welcomeReward;
-
-          /// 🔥 CHECK CREDIT NOTE
-          final creditQuery = await FirebaseFirestore
-              .instance
+          await docRef.update({
+            "amount": newAmount,
+            "Balance": newBalance,
+            "Comment": "Updated: App Signup Reward 🎉",
+            "updatedAt": FieldValue.serverTimestamp(),
+          });
+        } else {
+          await FirebaseFirestore.instance
               .collection("products")
               .doc(branch)
               .collection("creditNotes")
-              .where("mobileNumber", isEqualTo: phone)
-              .limit(1)
-              .get();
-
-          if (creditQuery.docs.isNotEmpty) {
-            final docRef = creditQuery.docs.first.reference;
-            final existing = creditQuery.docs.first.data();
-
-            final newAmount =
-                (existing["amount"] ?? 0) + welcomeReward;
-            final newBalance =
-                (existing["Balance"] ?? 0) + welcomeReward;
-
-            await docRef.update({
-              "amount": newAmount,
-              "Balance": newBalance,
-              "Comment":
-                  "Updated: App Signup Reward 🎉",
-              "updatedAt":
-                  FieldValue.serverTimestamp(),
-            });
-
-            print("🔄 Credit note updated");
-          } else {
-            await FirebaseFirestore.instance
-                .collection("products")
-                .doc(branch)
-                .collection("creditNotes")
-                .add({
-              "Name": data?["name"] ?? "Customer",
-              "mobileNumber": phone,
-              "amount": welcomeReward,
-              "CreditUsed": 0,
-              "Balance": welcomeReward,
-              "Comment": "App Signup Reward 🎉",
-              "status": "active",
-              "source": "app_signup",
-              "createdAt": FieldValue.serverTimestamp(),
-              "createdBy": "app",
-            });
-
-            print("🆕 Credit note created");
-          }
+              .add({
+            "Name": data?["name"] ?? "Customer",
+            "mobileNumber": phone,
+            "amount": welcomeReward,
+            "CreditUsed": 0,
+            "Balance": welcomeReward,
+            "Comment": "App Signup Reward 🎉",
+            "status": "active",
+            "source": "app_signup",
+            "createdAt": FieldValue.serverTimestamp(),
+            "createdBy": "app",
+          });
         }
+      }
 
-        /// 🔁 NORMAL LOGIN
-        else {
-          await userRef.set({
-            "lastLogin": FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-
-          print("✅ Returning user login");
-        }
+      /// 🔁 NORMAL LOGIN
+      else {
+        await userRef.set({
+          "lastLogin": FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
       }
     }
 
     if (!mounted) return;
+
+    /// 🔥 FCM SETUP
     await FCMService.setupFCM();
 
-    /// 🔥 LOAD HOME DATA
+    /// 🔥 LOAD HOME
     final homeProvider =
         Provider.of<HomeProvider>(context, listen: false);
-
     await homeProvider.loadHomeData();
 
     if (!mounted) return;
@@ -252,7 +238,7 @@ void verifyOtp() async {
       (route) => false,
     );
 
-    /// 🎉 SHOW REWARD POPUP
+    /// 🎉 POPUP
     if (showRewardPopup) {
       Future.delayed(const Duration(milliseconds: 400), () {
         showDialog(
@@ -431,9 +417,13 @@ void verifyOtp() async {
                   /// RESEND TIMER
                   seconds == 0
                       ? TextButton(
-                          onPressed: () {
-                            startTimer();
-                          },
+                         onPressed: () async {
+  startTimer();
+  await widget.authService.sendOtp(
+    phone: widget.phone,
+    codeSent: () {},
+  );
+},
                           child: const Text(
                             "Resend OTP",
                             style: TextStyle(

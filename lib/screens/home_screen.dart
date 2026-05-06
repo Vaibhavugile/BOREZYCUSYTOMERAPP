@@ -13,6 +13,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'wishlist_screen.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import '../services/user_helper.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -205,36 +206,65 @@ void initState() {
                 const SizedBox(width: 6),
 
                 /// 🔥 REAL WALLET VALUE
-               StreamBuilder<DocumentSnapshot>(
-  stream: FirebaseFirestore.instance
-      .collection("customers")
-      .doc(TenantConfig.branchCode)
-      .collection("users")
-      .doc(
-        FirebaseAuth.instance.currentUser?.phoneNumber
-            ?.replaceAll('+91', ''), // ✅ FIX
-      )
-      .snapshots(),
-  builder: (context, snapshot) {
+              FutureBuilder<String?>(
+  future: UserHelper.getPhone(),
+  builder: (context, phoneSnap) {
 
-    int wallet = 0;
-
-    if (snapshot.hasData &&
-        snapshot.data != null &&
-        snapshot.data!.exists) {
-
-      final data =
-          snapshot.data!.data() as Map<String, dynamic>;
-
-      wallet = data["creditBalance"] ?? 0;
+    /// 🔥 LOADING STATE
+    if (phoneSnap.connectionState == ConnectionState.waiting) {
+      return const Text(
+        "₹0",
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+        ),
+      );
     }
 
-    return Text(
-      "₹$wallet",
-      style: const TextStyle(
-        fontWeight: FontWeight.bold,
-        fontSize: 13,
-      ),
+    /// ❌ NO PHONE
+    if (!phoneSnap.hasData || phoneSnap.data == null) {
+      return const Text(
+        "₹0",
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+        ),
+      );
+    }
+
+    final phone = phoneSnap.data!;
+
+    /// 🔥 REALTIME WALLET
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection("customers")
+          .doc(TenantConfig.branchCode)
+          .collection("users")
+          .doc(phone)
+          .snapshots(),
+
+      builder: (context, snapshot) {
+
+        int wallet = 0;
+
+        if (snapshot.hasData &&
+            snapshot.data != null &&
+            snapshot.data!.exists) {
+
+          final data =
+              snapshot.data!.data() as Map<String, dynamic>;
+
+          wallet = data["creditBalance"] ?? 0;
+        }
+
+        return Text(
+          "₹$wallet",
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
+        );
+      },
     );
   },
 ),

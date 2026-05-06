@@ -1,13 +1,13 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'tenant_config.dart';
+import 'user_helper.dart';
 
 class FCMService {
 
   static Future<void> setupFCM() async {
 
-    /// 🔥 1. Ask permission (iOS mainly)
+    /// 🔥 1. Ask permission
     await FirebaseMessaging.instance.requestPermission();
 
     /// 🔥 2. Get token
@@ -17,25 +17,23 @@ class FCMService {
 
     if (token == null) return;
 
-    /// 🔥 3. Get user phone (your doc ID)
-    final phone = FirebaseAuth.instance.currentUser?.phoneNumber;
+    /// 🔥 3. Get phone (from local storage)
+    final phone = await UserHelper.getPhone();
     if (phone == null) return;
 
-    final cleanPhone = phone.replaceAll("+91", "");
-
-    /// 🔥 4. Save token in Firestore
-    await FirebaseFirestore.instance
-        .collection("customers")
-        .doc(TenantConfig.branchCode)
-        .collection("users")
-        .doc(cleanPhone)
-        .update({
-      "fcmToken": token,
-    });
-
-    /// 🔥 5. Subscribe to branch topic
     final branch = TenantConfig.branchCode;
 
+    /// 🔥 4. Save token safely (FIXED)
+    await FirebaseFirestore.instance
+        .collection("customers")
+        .doc(branch)
+        .collection("users")
+        .doc(phone)
+        .set({
+      "fcmToken": token,
+    }, SetOptions(merge: true)); // ✅ FIX
+
+    /// 🔥 5. Subscribe to branch topic
     await FirebaseMessaging.instance
         .subscribeToTopic("branch_$branch");
 

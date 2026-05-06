@@ -1,42 +1,42 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../services/tenant_config.dart';
+import '../services/user_helper.dart';
 
 class WishlistService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  String? get userId {
-  final phone = _auth.currentUser?.phoneNumber;
-  if (phone == null) return null;
+  /// 🔥 GET USER ID (FROM LOCAL STORAGE)
+  Future<String?> get userId async {
+    return await UserHelper.getPhone();
+  }
 
-  /// 🔥 convert +91 9988636521 → 9988636521
-  return phone.replaceAll(RegExp(r'[^0-9]'), '');
-}
+  /// 🔥 COLLECTION REFERENCE (FIXED - ASYNC)
+  Future<CollectionReference<Map<String, dynamic>>> _wishlistRef() async {
+    final branch = TenantConfig.branchCode;
+    final id = await userId;
 
-  /// 🔥 COLLECTION REFERENCE (clean + reusable)
- CollectionReference<Map<String, dynamic>> _wishlistRef() {
-  final branch = TenantConfig.branchCode;
+    return _firestore
+        .collection("customers")
+        .doc(branch)
+        .collection("users")
+        .doc(id)
+        .collection("wishlist");
+  }
 
-  return _firestore
-      .collection("customers")
-      .doc(branch)
-      .collection("users")
-      .doc(userId)
-      .collection("wishlist");
-}
-
-  /// 🔥 ADD TO WISHLIST (USING PRODUCT ID)
+  /// 🔥 ADD TO WISHLIST
   Future<void> addToWishlist({
     required String productId,
     required Map<String, dynamic> product,
   }) async {
-    if (userId == null) return;
+    final id = await userId;
+    if (id == null) return;
 
     try {
-      await _wishlistRef().doc(productId).set({
+      final ref = await _wishlistRef();
+
+      await ref.doc(productId).set({
         ...product,
-        "productId": productId, // ✅ store explicitly
+        "productId": productId,
         "createdAt": FieldValue.serverTimestamp(),
       });
     } catch (e) {
@@ -46,10 +46,12 @@ class WishlistService {
 
   /// 🔥 REMOVE FROM WISHLIST
   Future<void> removeFromWishlist(String productId) async {
-    if (userId == null) return;
+    final id = await userId;
+    if (id == null) return;
 
     try {
-      await _wishlistRef().doc(productId).delete();
+      final ref = await _wishlistRef();
+      await ref.doc(productId).delete();
     } catch (e) {
       throw Exception("Failed to remove from wishlist: $e");
     }
@@ -57,10 +59,12 @@ class WishlistService {
 
   /// 🔥 CHECK (SINGLE DOC)
   Future<bool> isWishlisted(String productId) async {
-    if (userId == null) return false;
+    final id = await userId;
+    if (id == null) return false;
 
     try {
-      final doc = await _wishlistRef().doc(productId).get();
+      final ref = await _wishlistRef();
+      final doc = await ref.doc(productId).get();
       return doc.exists;
     } catch (e) {
       return false;
@@ -68,21 +72,33 @@ class WishlistService {
   }
 
   /// 🔥 STREAM (REAL-TIME LIST)
-  Stream<QuerySnapshot<Map<String, dynamic>>> getWishlistStream() {
-    if (userId == null) {
-      return const Stream.empty();
+  Stream<QuerySnapshot<Map<String, dynamic>>> getWishlistStream() async* {
+    final id = await userId;
+
+    if (id == null) {
+      yield* const Stream.empty();
+      return;
     }
 
-    return _wishlistRef()
+    final branch = TenantConfig.branchCode;
+
+    yield* _firestore
+        .collection("customers")
+        .doc(branch)
+        .collection("users")
+        .doc(id)
+        .collection("wishlist")
         .orderBy("createdAt", descending: true)
         .snapshots();
   }
 
-  /// 🔥 OPTIONAL: CLEAR ALL (for logout)
+  /// 🔥 CLEAR ALL
   Future<void> clearWishlist() async {
-    if (userId == null) return;
+    final id = await userId;
+    if (id == null) return;
 
-    final snapshot = await _wishlistRef().get();
+    final ref = await _wishlistRef();
+    final snapshot = await ref.get();
 
     for (var doc in snapshot.docs) {
       await doc.reference.delete();
