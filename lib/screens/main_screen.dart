@@ -6,6 +6,7 @@ import 'browse_screen.dart';
 import 'rentals_screen.dart';
 import 'profile_screen.dart';
 import 'booking_list_screen.dart';
+import 'store_screen.dart';
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -19,7 +20,7 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> pages = const [
     HomeScreen(),
-    BrowseScreen(),
+    StorePage(),
     BookingListScreen(),
     ProfileScreen(),
   ];

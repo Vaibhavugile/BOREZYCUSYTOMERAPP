@@ -1,5 +1,34 @@
 {
   "branchCode": "7007",
+
   "appName": "DOR",
-  "supportPhone": "918698797007"
+
+  "supportPhone": "918698797007",
+
+  "appIcon":
+      "assets/logo/app_icon.png",
+
+  "storeName":
+      "DOR Luxe Rentals",
+
+  "storeTagline":
+      "Luxury fashion rentals for every occasion",
+
+  "storeAddress":
+      "MG Road, Pune, Maharashtra",
+
+  "storeTiming":
+      "10:00 AM - 9:00 PM",
+
+  "storeImage":
+      "https://your-image-url.com/store.jpg",
+
+  "instagramUrl":
+      "https://instagram.com/yourpage",
+
+  "facebookUrl":
+      "https://facebook.com/yourpage",
+
+  "googleMapUrl":
+      "https://maps.google.com/?q=MG+Road+Pune"
 }

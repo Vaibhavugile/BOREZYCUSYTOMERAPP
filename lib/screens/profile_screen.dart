@@ -1,13 +1,18 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_gradients.dart';
 import '../services/tenant_config.dart';
+import '../services/user_helper.dart';
+
 import 'booking_list_screen.dart';
 import 'wishlist_screen.dart';
-import '../services/user_helper.dart';
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -18,10 +23,16 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
 
   int points = 0;
-  String customerName = "Customer";
   int rentals = 0;
+bool isEditingName = false;
+  String customerName = "Customer";
+  String profileImageUrl = "";
 
   bool loading = true;
+  bool savingProfile = false;
+
+  final TextEditingController nameController =
+      TextEditingController();
 
   @override
   void initState() {
@@ -29,70 +40,197 @@ class _ProfileScreenState extends State<ProfileScreen> {
     loadProfileData();
   }
 
-Future<void> loadProfileData() async {
+  /// 🔥 LOAD PROFILE
+  Future<void> loadProfileData() async {
 
-  final cleanPhone = await UserHelper.getPhone();
-  if (cleanPhone == null) return;
+    final cleanPhone = await UserHelper.getPhone();
+    if (cleanPhone == null) return;
 
-  final branch = TenantConfig.branchCode;
+    final branch = TenantConfig.branchCode;
 
-  final customerDoc = await FirebaseFirestore.instance
-      .collection("customers")
-      .doc(branch)
-      .collection("users")
-      .doc(cleanPhone)
-      .get();
+    final customerDoc = await FirebaseFirestore.instance
+        .collection("customers")
+        .doc(branch)
+        .collection("users")
+        .doc(cleanPhone)
+        .get();
 
-  if (customerDoc.exists) {
+    if (customerDoc.exists) {
 
-    final data = customerDoc.data()!;
+      final data = customerDoc.data()!;
 
-    customerName = data["name"] ?? "Customer";
+      customerName = data["name"] ?? "Customer";
 
-    final branchStats = data["branchStats"] ?? {};
-    final currentBranchStats = branchStats[branch] ?? {};
+      profileImageUrl = data["profileImage"] ?? "";
 
-    rentals = currentBranchStats["receipts"] ?? 0;
-    points = (currentBranchStats["creditBalance"] ?? 0).toInt();
+      nameController.text = customerName;
+
+      final branchStats = data["branchStats"] ?? {};
+      final currentBranchStats = branchStats[branch] ?? {};
+
+      rentals = currentBranchStats["receipts"] ?? 0;
+      points =
+          (currentBranchStats["creditBalance"] ?? 0).toInt();
+    }
+
+    setState(() {
+      loading = false;
+    });
   }
 
-  setState(() {
-    loading = false;
-  });
-}
+  /// 🔥 PICK + UPLOAD IMAGE
+  Future<void> pickProfileImage() async {
 
+    final phone = await UserHelper.getPhone();
+    if (phone == null) return;
+
+    final picker = ImagePicker();
+
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+    );
+
+    if (picked == null) return;
+
+    setState(() {
+      savingProfile = true;
+    });
+
+    try {
+
+      final file = File(picked.path);
+
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child("profile_images")
+          .child(
+            "${TenantConfig.branchCode}_$phone.jpg",
+          );
+
+      await ref.putFile(file);
+
+      final downloadUrl = await ref.getDownloadURL();
+
+      await FirebaseFirestore.instance
+          .collection("customers")
+          .doc(TenantConfig.branchCode)
+          .collection("users")
+          .doc(phone)
+          .set({
+        "profileImage": downloadUrl,
+      }, SetOptions(merge: true));
+
+      setState(() {
+        profileImageUrl = downloadUrl;
+      });
+
+    } catch (e) {
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Upload failed: $e"),
+        ),
+      );
+    }
+
+    setState(() {
+      savingProfile = false;
+    });
+  }
+
+  /// 🔥 SAVE PROFILE
+  Future<void> saveProfile() async {
+
+    final phone = await UserHelper.getPhone();
+    if (phone == null) return;
+
+    setState(() {
+      savingProfile = true;
+    });
+
+    try {
+
+      await FirebaseFirestore.instance
+          .collection("customers")
+          .doc(TenantConfig.branchCode)
+          .collection("users")
+          .doc(phone)
+          .set({
+
+        "name": nameController.text.trim(),
+        "profileImage": profileImageUrl,
+
+      }, SetOptions(merge: true));
+
+      setState(() {
+        customerName = nameController.text.trim();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Profile updated"),
+        ),
+      );
+
+    } catch (e) {
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error: $e"),
+        ),
+      );
+    }
+
+    setState(() {
+      savingProfile = false;
+    });
+  }
+
+  /// 🔥 MENU ITEM
   Widget buildMenuItem({
-  required IconData icon,
-  required String title,
-  required String subtitle,
-  VoidCallback? onTap, // ✅ ADD THIS
-  Color iconColor = AppColors.primary,
-}) {
-  return ListTile(
-    onTap: onTap, // ✅ ADD THIS
-    leading: Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.primaryLight,
-        borderRadius: BorderRadius.circular(14),
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    VoidCallback? onTap,
+    Color iconColor = AppColors.primary,
+  }) {
+
+    return ListTile(
+      onTap: onTap,
+
+      leading: Container(
+        padding: const EdgeInsets.all(12),
+
+        decoration: BoxDecoration(
+          color: AppColors.primaryLight,
+          borderRadius: BorderRadius.circular(14),
+        ),
+
+        child: Icon(icon, color: iconColor),
       ),
-      child: Icon(icon, color: iconColor),
-    ),
-    title: Text(
-      title,
-      style: const TextStyle(fontWeight: FontWeight.w600),
-    ),
-    subtitle: Text(subtitle),
-    trailing: const Icon(Icons.chevron_right),
-  );
-}
+
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+
+      subtitle: Text(subtitle),
+
+      trailing: const Icon(Icons.chevron_right),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
 
     if (loading) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
       );
     }
 
@@ -102,15 +240,18 @@ Future<void> loadProfileData() async {
 
       appBar: AppBar(
         centerTitle: true,
-       title: Text(
-  TenantConfig.appName,
-  style: const TextStyle(
-    color: AppColors.primary,
-    fontWeight: FontWeight.bold,
-    letterSpacing: 4,
-  ),
-),
+
+        title: Text(
+          TenantConfig.appName,
+          style: const TextStyle(
+            color: AppColors.primary,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 4,
+          ),
+        ),
+
         leading: const Icon(Icons.menu),
+
         actions: const [
           Padding(
             padding: EdgeInsets.only(right: 12),
@@ -124,11 +265,11 @@ Future<void> loadProfileData() async {
         padding: const EdgeInsets.all(20),
 
         child: Column(
-
           children: [
 
-            /// PROFILE CARD
+            /// 🔥 PROFILE CARD
             Container(
+
               padding: const EdgeInsets.all(24),
 
               decoration: BoxDecoration(
@@ -143,30 +284,55 @@ Future<void> loadProfileData() async {
               ),
 
               child: Column(
-
                 children: [
 
+                  /// 🔥 PROFILE IMAGE
                   Stack(
                     alignment: Alignment.bottomRight,
+
                     children: [
 
-                      const CircleAvatar(
+                      CircleAvatar(
                         radius: 55,
-                        backgroundImage: NetworkImage(
-                          "https://i.pravatar.cc/300",
-                        ),
+                        backgroundColor:
+                            AppColors.primaryLight,
+
+                        backgroundImage:
+                            profileImageUrl.isNotEmpty
+                                ? NetworkImage(
+                                    profileImageUrl,
+                                  )
+                                : null,
+
+                        child: profileImageUrl.isEmpty
+                            ? const Icon(
+                                Icons.person,
+                                size: 45,
+                                color: AppColors.primary,
+                              )
+                            : null,
                       ),
 
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: const BoxDecoration(
-                          gradient: AppGradients.primaryGradient,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.edit,
-                          color: Colors.white,
-                          size: 18,
+                      GestureDetector(
+
+                        onTap: savingProfile
+                            ? null
+                            : pickProfileImage,
+
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+
+                          decoration: const BoxDecoration(
+                            gradient:
+                                AppGradients.primaryGradient,
+                            shape: BoxShape.circle,
+                          ),
+
+                          child: const Icon(
+                            Icons.edit,
+                            color: Colors.white,
+                            size: 18,
+                          ),
                         ),
                       ),
                     ],
@@ -174,29 +340,120 @@ Future<void> loadProfileData() async {
 
                   const SizedBox(height: 20),
 
-                  /// CUSTOMER NAME
-                  Text(
-                    customerName,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  /// 🔥 EDIT NAME
+                 /// 🔥 NAME + EDIT
+Row(
+  mainAxisAlignment: MainAxisAlignment.center,
+  children: [
+
+    Expanded(
+      child: TextField(
+        controller: nameController,
+        enabled: isEditingName,
+        textAlign: TextAlign.center,
+
+        decoration: const InputDecoration(
+          border: InputBorder.none,
+          hintText: "Enter your name",
+        ),
+
+        style: const TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    ),
+
+    GestureDetector(
+      onTap: () {
+        setState(() {
+          isEditingName = true;
+        });
+      },
+
+      child: Container(
+        padding: const EdgeInsets.all(8),
+
+        decoration: BoxDecoration(
+          color: AppColors.primaryLight,
+          borderRadius: BorderRadius.circular(12),
+        ),
+
+        child: const Icon(
+          Icons.edit,
+          size: 18,
+          color: AppColors.primary,
+        ),
+      ),
+    ),
+  ],
+),
 
                   const SizedBox(height: 8),
 
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 6),
+                      horizontal: 14,
+                      vertical: 6,
+                    ),
+
                     decoration: BoxDecoration(
                       color: AppColors.primaryLight,
                       borderRadius: BorderRadius.circular(20),
                     ),
+
                     child: const Text(
                       "Customer",
-                      style: TextStyle(color: AppColors.primary),
+                      style: TextStyle(
+                        color: AppColors.primary,
+                      ),
                     ),
                   ),
+
+                  const SizedBox(height: 24),
+
+                  /// 🔥 SAVE BUTTON
+                /// 🔥 SAVE BUTTON
+if (isEditingName)
+  SizedBox(
+    width: double.infinity,
+    height: 52,
+
+    child: ElevatedButton(
+
+      onPressed: savingProfile
+          ? null
+          : () async {
+
+              await saveProfile();
+
+              setState(() {
+                isEditingName = false;
+              });
+            },
+
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+      ),
+
+      child: savingProfile
+          ? const CircularProgressIndicator(
+              color: Colors.white,
+            )
+          : const Text(
+              "Save Profile",
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+    ),
+  ),
 
                   const SizedBox(height: 24),
 
@@ -204,9 +461,11 @@ Future<void> loadProfileData() async {
 
                   const SizedBox(height: 20),
 
-                  /// STATS
+                  /// 🔥 STATS
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    mainAxisAlignment:
+                        MainAxisAlignment.spaceEvenly,
+
                     children: [
 
                       Column(
@@ -214,8 +473,10 @@ Future<void> loadProfileData() async {
                           Text(
                             "$rentals",
                             style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold),
+                              fontSize: 20,
+                              fontWeight:
+                                  FontWeight.bold,
+                            ),
                           ),
                           const Text("RENTALS")
                         ],
@@ -223,10 +484,14 @@ Future<void> loadProfileData() async {
 
                       const Column(
                         children: [
-                          Text("0",
-                              style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold)),
+                          Text(
+                            "0",
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight:
+                                  FontWeight.bold,
+                            ),
+                          ),
                           Text("WISHLIST")
                         ],
                       ),
@@ -237,9 +502,11 @@ Future<void> loadProfileData() async {
                             "$points",
                             style: const TextStyle(
                               fontSize: 20,
-                              fontWeight: FontWeight.bold,
+                              fontWeight:
+                                  FontWeight.bold,
                             ),
                           ),
+
                           const Text(
                             "POINTS",
                             style: TextStyle(
@@ -250,7 +517,6 @@ Future<void> loadProfileData() async {
                           ),
                         ],
                       ),
-
                     ],
                   )
                 ],
@@ -259,77 +525,87 @@ Future<void> loadProfileData() async {
 
             const SizedBox(height: 30),
 
+            /// 🔥 ACCOUNT PREF
             const Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 "Account Preferences",
                 style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black54),
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black54,
+                ),
               ),
             ),
 
             const SizedBox(height: 10),
 
             Container(
+
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
               ),
 
-             child: Column(
-  children: [
+              child: Column(
+                children: [
 
-    /// 📦 BOOKINGS
-    buildMenuItem(
-      icon: Icons.calendar_today,
-      title: "My Bookings",
-      subtitle: "History and upcoming rentals",
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const BookingListScreen(),
-          ),
-        );
-      },
-    ),
+                  buildMenuItem(
+                    icon: Icons.calendar_today,
+                    title: "My Bookings",
+                    subtitle:
+                        "History and upcoming rentals",
 
-    const Divider(),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const BookingListScreen(),
+                        ),
+                      );
+                    },
+                  ),
 
-    /// ❤️ WISHLIST
-    buildMenuItem(
-      icon: Icons.favorite_border,
-      title: "Wishlist",
-      subtitle: "Items you've saved for later",
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const WishlistScreen(),
-          ),
-        );
-      },
-    ),
-  ],
-),
+                  const Divider(),
+
+                  buildMenuItem(
+                    icon: Icons.favorite_border,
+                    title: "Wishlist",
+                    subtitle:
+                        "Items you've saved for later",
+
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const WishlistScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
 
             const SizedBox(height: 25),
 
+            /// 🔥 HELP
             const Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 "Help & Security",
                 style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black54),
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black54,
+                ),
               ),
             ),
 
             const SizedBox(height: 10),
 
             Container(
+
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
@@ -341,25 +617,39 @@ Future<void> loadProfileData() async {
                   buildMenuItem(
                     icon: Icons.support_agent,
                     title: "Support",
-                    subtitle: "24/7 concierge assistance",
+                    subtitle:
+                        "24/7 concierge assistance",
                   ),
 
                   const Divider(),
 
                   ListTile(
+
                     leading: Container(
                       padding: const EdgeInsets.all(12),
+
                       decoration: BoxDecoration(
                         color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius:
+                            BorderRadius.circular(14),
                       ),
-                      child: const Icon(Icons.logout, color: Colors.red),
+
+                      child: const Icon(
+                        Icons.logout,
+                        color: Colors.red,
+                      ),
                     ),
+
                     title: const Text(
                       "Logout",
-                      style: TextStyle(color: Colors.red),
+                      style: TextStyle(
+                        color: Colors.red,
+                      ),
                     ),
-                    subtitle: const Text("Sign out of your account"),
+
+                    subtitle: const Text(
+                      "Sign out of your account",
+                    ),
                   ),
                 ],
               ),
@@ -368,12 +658,13 @@ Future<void> loadProfileData() async {
             const SizedBox(height: 30),
 
             Text(
-  "${TenantConfig.appName} V2.4.0",
-  style: const TextStyle(color: Colors.black45),
-),
+              "${TenantConfig.appName} V2.4.0",
+              style: const TextStyle(
+                color: Colors.black45,
+              ),
+            ),
 
             const SizedBox(height: 40),
-
           ],
         ),
       ),

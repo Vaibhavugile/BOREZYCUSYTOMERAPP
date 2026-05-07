@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/tenant_config.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_gradients.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 class BookingDetailsScreen extends StatelessWidget {
 final Map<String, dynamic> booking;
 
@@ -12,6 +15,19 @@ required this.booking,
 
 String formatDate(DateTime date) {
 return "${date.day}/${date.month}/${date.year}";
+}
+String formatDateTime(DateTime date) {
+
+  final hour = date.hour > 12
+      ? date.hour - 12
+      : date.hour;
+
+  final amPm = date.hour >= 12 ? "PM" : "AM";
+
+  return "${date.day}/${date.month}/${date.year} "
+      "${hour.toString().padLeft(2, '0')}:"
+      "${date.minute.toString().padLeft(2, '0')} "
+      "$amPm";
 }
 
 @override
@@ -24,7 +40,7 @@ final pickup = (booking["pickupDate"] as Timestamp).toDate();
 final returnDate = (booking["returnDate"] as Timestamp).toDate();
 
 return Scaffold(
-  backgroundColor: const Color(0xFFF6F6F8),
+  backgroundColor: AppColors.background,
 
   appBar: AppBar(
     title: const Text("Booking Details"),
@@ -33,8 +49,15 @@ return Scaffold(
   ),
 
   bottomNavigationBar: _bottomActions(),
+body: RefreshIndicator(
+  onRefresh: () async {
 
-  body: ListView(
+    await Future.delayed(
+      const Duration(milliseconds: 500),
+    );
+  },
+
+  child: ListView(
     padding: const EdgeInsets.all(20),
     children: [
 
@@ -73,6 +96,7 @@ return Scaffold(
 
     ],
   ),
+  ),
 );
 
 
@@ -95,19 +119,17 @@ switch(booking["bookingStage"]){
     stageColor = Colors.blue;
     break;
   default:
-    stageColor = Colors.purple;
+    stageColor = AppColors.primary;
 }
 
 return Container(
   padding: const EdgeInsets.all(22),
   decoration: BoxDecoration(
-    gradient: const LinearGradient(
-      colors: [Color(0xFF6A5AE0), Color(0xFF8E7CFF)],
-    ),
+    gradient: AppGradients.primaryGradient,
     borderRadius: BorderRadius.circular(22),
     boxShadow: [
       BoxShadow(
-        color: Colors.black.withOpacity(.15),
+        color: AppColors.textPrimary.withOpacity(.15),
         blurRadius: 20,
       )
     ],
@@ -205,12 +227,24 @@ return _cardWrapper(
       const _sectionTitle("Customer Details", Icons.person),
 
       const SizedBox(height:14),
+_infoRow("Name", booking["clientName"]),
+_infoRow("Contact", booking["contact"]),
+_infoRow("Customer By", booking["customerBy"]),
+_infoRow("Receipt By", booking["receiptBy"]),
 
-      _infoRow("Name", booking["clientName"]),
-      _infoRow("Contact", booking["contact"]),
-      _infoRow("Customer By", booking["customerBy"]),
-      _infoRow("Receipt By", booking["receiptBy"]),
+if((booking["alterations"] ?? "").toString().isNotEmpty)
+  _infoRow(
+    "Alterations",
+    booking["alterations"],
+  ),
 
+if(booking["createdAt"] != null)
+  _infoRow(
+    "Created At",
+    formatDateTime(
+      (booking["createdAt"] as Timestamp).toDate(),
+    ),
+  ),
     ],
   ),
 );
@@ -244,7 +278,7 @@ return _cardWrapper(
             boxShadow: [
               BoxShadow(
                 blurRadius: 10,
-                color: Colors.black.withOpacity(.08),
+                color: AppColors.textPrimary.withOpacity(.08),
               )
             ],
           ),
@@ -254,25 +288,25 @@ return _cardWrapper(
             leading: ClipRRect(
   borderRadius: BorderRadius.circular(10),
   child: p["imageUrl"] != null && p["imageUrl"].toString().isNotEmpty
-      ? Image.network(
-          p["imageUrl"],
-          width: 60,
-          height: 80,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              width: 60,
-              height: 80,
-              color: Colors.grey.shade200,
-              child: const Icon(Icons.image, color: Colors.grey),
-            );
-          },
-        )
+      ? CachedNetworkImage(
+  imageUrl: p["imageUrl"],
+  width: 60,
+  height: 80,
+  fit: BoxFit.cover,
+  errorWidget: (context, url, error) {
+    return Container(
+      width: 60,
+      height: 80,
+      color: AppColors.primaryLight,
+      child: const Icon(Icons.image),
+    );
+  },
+)
       : Container(
           width: 60,
           height: 80,
-          color: Colors.grey.shade200,
-          child: const Icon(Icons.image, color: Colors.grey),
+          color: AppColors.textSecondary,
+          child: const Icon(Icons.image, color: AppColors.textSecondary),
         ),
 ),
 
@@ -349,16 +383,16 @@ return _cardWrapper(
 Widget _paymentHistory(){
 
 
-return StreamBuilder(
+return FutureBuilder(
 
-stream: FirebaseFirestore.instance
+future: FirebaseFirestore.instance
     .collection("products")
     .doc(TenantConfig.branchCode)
     .collection("payments")
     .doc(booking["receiptNumber"])
     .collection("transactions")
     .orderBy("createdAt", descending: true)
-    .snapshots(),
+    .get(),
 
   builder:(context,snapshot){
 
@@ -394,7 +428,7 @@ stream: FirebaseFirestore.instance
               padding: const EdgeInsets.all(14),
 
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: AppColors.textSecondary,
                 borderRadius: BorderRadius.circular(14),
               ),
 
@@ -473,14 +507,14 @@ return _cardWrapper(
       const SizedBox(height:14),
 
       _infoRow("Total Rent","₹${payment["finalRent"]}"),
-      _infoRow("Rent Collected","₹${payment["rentCollected"]}"),
+      _infoRow("Rent Paid","₹${payment["rentCollected"]}"),
       _infoRow("Rent Pending","₹${payment["rentPending"]}"),
 
       const Divider(),
 
       _infoRow("Total Deposit","₹${payment["finalDeposit"]}"),
       _infoRow("Deposit Returned","₹${payment["depositReturned"]}"),
-      _infoRow("Deposit With You","₹${payment["depositWithYou"]}"),
+      _infoRow("Deposit With Us","₹${payment["depositWithYou"]}"),
 
     ],
   ),
@@ -604,9 +638,21 @@ Widget _cardWrapper(Widget child){
 return Container(
   padding: const EdgeInsets.all(18),
   decoration: BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(18),
+  color: Colors.white,
+
+  borderRadius: BorderRadius.circular(18),
+
+  border: Border.all(
+    color: AppColors.primaryLight,
   ),
+
+  boxShadow: [
+    BoxShadow(
+      color: Colors.black.withOpacity(.04),
+      blurRadius: 12,
+    )
+  ],
+),
   child: child,
 );
 
@@ -626,7 +672,7 @@ return Padding(
         flex:4,
         child: Text(
           label,
-          style: const TextStyle(color: Colors.grey),
+          style: const TextStyle(color: AppColors.textSecondary),
         ),
       ),
 
@@ -637,7 +683,7 @@ return Padding(
           textAlign: TextAlign.right,
           style: TextStyle(
             fontWeight: FontWeight.w600,
-            color: color ?? Colors.black,
+            color: color ?? AppColors.textPrimary,
           ),
         ),
       )
@@ -664,7 +710,7 @@ Widget build(BuildContext context){
 return Row(
   children: [
 
-    Icon(icon,color: Colors.purple),
+    Icon(icon,color: AppColors.primary),
 
     const SizedBox(width:8),
 
