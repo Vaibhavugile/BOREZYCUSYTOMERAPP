@@ -24,7 +24,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
 
   bool loadRest = false;
-
+List<Map<String, String>> notifications = [];
   @override
 void initState() {
   super.initState();
@@ -38,17 +38,115 @@ void initState() {
   /// 🔔 FOREGROUND NOTIFICATION
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
 
-    final title = message.notification?.title ?? "";
-    final body = message.notification?.body ?? "";
+  final title =
+      message.notification?.title ?? "Notification";
 
-    if (!mounted) return;
+  final body =
+      message.notification?.body ?? "";
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("$title\n$body"),
-      ),
-    );
+  /// 🔥 SAVE NOTIFICATION
+  notifications.insert(0, {
+    "title": title,
+    "body": body,
   });
+
+  if (mounted) {
+    setState(() {});
+  }
+
+  /// 🔥 OPTIONAL SNACKBAR
+  if (!mounted) return;
+
+  ScaffoldMessenger.of(context).showSnackBar(
+
+  SnackBar(
+    behavior: SnackBarBehavior.floating,
+
+    backgroundColor: Colors.transparent,
+    elevation: 0,
+
+    margin: const EdgeInsets.all(16),
+
+    content: Container(
+      padding: const EdgeInsets.all(16),
+
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFFC8A96B),
+            Color(0xFFE0C48F),
+          ],
+        ),
+
+        borderRadius: BorderRadius.circular(20),
+
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(.12),
+            blurRadius: 12,
+          )
+        ],
+      ),
+
+      child: Row(
+        children: [
+
+          Container(
+            padding: const EdgeInsets.all(10),
+
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(.2),
+              shape: BoxShape.circle,
+            ),
+
+            child: const Icon(
+              Icons.notifications_active,
+              color: Colors.white,
+            ),
+          ),
+
+          const SizedBox(width: 14),
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+
+              mainAxisSize: MainAxisSize.min,
+
+              children: [
+
+                Text(
+                  title,
+
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                Text(
+                  body,
+
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          )
+        ],
+      ),
+    ),
+
+    duration: const Duration(seconds: 3),
+  ),
+);
+});
 
   /// Lazy load rest
   Future.delayed(const Duration(milliseconds: 300), () {
@@ -160,24 +258,61 @@ void initState() {
         const Spacer(),
 
         /// 🔔 NOTIFICATION
-        Stack(
-          children: [
-            const Icon(Icons.notifications_none, size: 26),
+    GestureDetector(
+  onTap: () {
+    showNotificationsSheet();
+  },
 
-            Positioned(
-              right: 0,
-              top: 0,
-              child: Container(
-                height: 8,
-                width: 8,
-                decoration: const BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                ),
+  child: Stack(
+    clipBehavior: Clip.none,
+
+    children: [
+
+      const Icon(
+        Icons.notifications_none,
+        size: 26,
+      ),
+
+      /// 🔥 BADGE
+      if (notifications.isNotEmpty)
+        Positioned(
+          right: -4,
+          top: -4,
+
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 5,
+              vertical: 2,
+            ),
+
+            decoration: BoxDecoration(
+              color: Colors.red,
+              borderRadius: BorderRadius.circular(20),
+            ),
+
+            constraints: const BoxConstraints(
+              minWidth: 16,
+              minHeight: 16,
+            ),
+
+            child: Text(
+              notifications.length > 9
+                  ? "9+"
+                  : notifications.length.toString(),
+
+              textAlign: TextAlign.center,
+
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
               ),
             ),
-          ],
+          ),
         ),
+    ],
+  ),
+),
 
         const SizedBox(width: 12),
 
@@ -1143,7 +1278,186 @@ Widget _collectionCard(String title, String image, String collectionId) {
     ),
   );
 }
+void showNotificationsSheet() {
 
+  showModalBottomSheet(
+    context: context,
+
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+
+    builder: (_) {
+
+      return Container(
+        height: MediaQuery.of(context).size.height * .75,
+
+        padding: const EdgeInsets.all(24),
+
+        decoration: const BoxDecoration(
+          color: Colors.white,
+
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(30),
+          ),
+        ),
+
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+
+          children: [
+
+            Center(
+              child: Container(
+                width: 50,
+                height: 5,
+
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            const Text(
+              "Notifications",
+
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            Expanded(
+              child: notifications.isEmpty
+
+                  ? const Center(
+                      child: Text(
+                        "No notifications yet",
+                      ),
+                    )
+
+                  : ListView.builder(
+                      itemCount: notifications.length,
+
+                      itemBuilder: (context, index) {
+
+                        final item = notifications[index];
+
+                        return Dismissible(
+
+  key: Key(index.toString()),
+
+  direction: DismissDirection.endToStart,
+
+  onDismissed: (_) {
+
+    setState(() {
+      notifications.removeAt(index);
+    });
+  },
+
+  background: Container(
+    alignment: Alignment.centerRight,
+
+    padding: const EdgeInsets.only(right: 24),
+
+    decoration: BoxDecoration(
+      color: Colors.red,
+      borderRadius: BorderRadius.circular(20),
+    ),
+
+    child: const Icon(
+      Icons.delete,
+      color: Colors.white,
+    ),
+  ),
+
+  child: notificationTile(
+    Icons.notifications,
+    item["title"] ?? "",
+    item["body"] ?? "",
+  ),
+);
+                      },
+                    ),
+            )
+          ],
+        ),
+      );
+    },
+  );
+}
+Widget notificationTile(
+  IconData icon,
+  String title,
+  String subtitle,
+) {
+
+  return Container(
+    margin: const EdgeInsets.only(bottom: 14),
+
+    padding: const EdgeInsets.all(16),
+
+    decoration: BoxDecoration(
+      color: const Color(0xFFF8F3EA),
+      borderRadius: BorderRadius.circular(20),
+    ),
+
+    child: Row(
+      children: [
+
+        Container(
+          padding: const EdgeInsets.all(10),
+
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+          ),
+
+          child: Icon(
+            icon,
+            color: const Color(0xFFC8A96B),
+          ),
+        ),
+
+        const SizedBox(width: 14),
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+
+            children: [
+
+              Text(
+                title,
+
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 4),
+
+              Text(
+                subtitle,
+
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 13,
+                ),
+              )
+            ],
+          ),
+        )
+      ],
+    ),
+  );
+}
   /// BRANCHES
  
 
