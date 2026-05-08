@@ -24,6 +24,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
 bool isLoading = false;
 bool hasMore = true;
 DocumentSnapshot? lastDoc;
+String selectedSort = "Newest";
 bool isFirstLoad = true;
 final ScrollController _scrollController = ScrollController();
 @override
@@ -72,8 +73,27 @@ Query query = FirebaseFirestore.instance
     .collection("products")
     .doc(TenantConfig.branchCode)
     .collection("products")
-    .where("collectionKeys", arrayContainsAny: keys)
-    .limit(20);
+    .where(
+      "collectionKeys",
+      arrayContainsAny: keys,
+    );
+
+/// 🔥 SORTING
+if (selectedSort == "Price Low To High") {
+
+  query = query.orderBy("price");
+
+} else if (selectedSort ==
+    "Price High To Low") {
+
+  query = query.orderBy(
+    "price",
+    descending: true,
+  );
+
+} 
+
+query = query.limit(20);
 
   if (lastDoc != null) {
     query = query.startAfterDocument(lastDoc!);
@@ -97,7 +117,90 @@ Query query = FirebaseFirestore.instance
   });
 }
 }
+Future<void> resetAndFetch() async {
 
+  products.clear();
+
+  lastDoc = null;
+
+  hasMore = true;
+
+  isFirstLoad = true;
+
+  setState(() {});
+
+  await fetchProducts();
+}
+ void showSortSheet() {
+
+  showModalBottomSheet(
+    context: context,
+
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(24),
+      ),
+    ),
+
+    builder: (_) {
+
+      final sorts = [
+
+        "Newest",
+
+        "Price Low To High",
+
+        "Price High To Low",
+      ];
+
+      return Padding(
+        padding: const EdgeInsets.all(20),
+
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+
+          children: [
+
+            const Text(
+              "Sort Products",
+
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            ...sorts.map((e) {
+
+              return RadioListTile(
+                value: e,
+
+                groupValue: selectedSort,
+
+                activeColor: Colors.black,
+
+                title: Text(e),
+
+                onChanged: (v) async {
+
+                  selectedSort = v.toString();
+
+                  Navigator.pop(context);
+
+                  await resetAndFetch();
+                },
+              );
+            }),
+          ],
+        ),
+      );
+    },
+  );
+}
   @override
   Widget build(BuildContext context) {
 
@@ -249,7 +352,9 @@ Query query = FirebaseFirestore.instance
 
             Expanded(
               child: InkWell(
-                onTap: () {},
+                onTap: () {
+  showSortSheet();
+},
                 child: const Center(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -516,4 +621,5 @@ final image = (imageList is List && imageList.isNotEmpty)
       ),
     );
   }
+ 
 }

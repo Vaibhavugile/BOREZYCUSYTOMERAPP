@@ -90,6 +90,10 @@ body: RefreshIndicator(
 
       const SizedBox(height:20),
 
+_attachmentsSection(context),
+      const SizedBox(height:20),
+
+
       _helpSection(),
 
       const SizedBox(height:40)
@@ -543,6 +547,190 @@ return _cardWrapper(
 );
 
 
+}
+Widget _attachmentsSection( BuildContext context,){
+
+  final attachments =
+      booking["attachments"] ?? [];
+
+  return _cardWrapper(
+
+    Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+
+      children: [
+
+        const _sectionTitle(
+          "Attachments",
+          Icons.attach_file,
+        ),
+
+        const SizedBox(height:14),
+
+        if(attachments.isEmpty)
+
+          const Text(
+            "No attachments available",
+          )
+
+        else
+
+          ...attachments.map<Widget>((item){
+
+            final data =
+                Map<String,dynamic>.from(item);
+
+            final images =
+                data["images"] ?? [];
+
+            return Container(
+
+              margin:
+                  const EdgeInsets.only(
+                      bottom:16),
+
+              padding:
+                  const EdgeInsets.all(14),
+
+              decoration: BoxDecoration(
+                color:
+                    AppColors.primaryLight,
+
+                borderRadius:
+                    BorderRadius.circular(
+                        16),
+              ),
+
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+
+                children: [
+
+                  Text(
+                    data["title"] ?? "",
+
+                    style:
+                        const TextStyle(
+                      fontWeight:
+                          FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+
+                  if((data["note"] ?? "")
+                      .toString()
+                      .isNotEmpty)
+
+                    Padding(
+                      padding:
+                          const EdgeInsets.only(
+                              top:8),
+
+                      child: Text(
+                        data["note"],
+
+                        style:
+                            const TextStyle(
+                          color: Colors.grey,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+
+                  if(images.isNotEmpty)
+
+                    Padding(
+                      padding:
+                          const EdgeInsets.only(
+                              top:14),
+
+                      child:
+                          SingleChildScrollView(
+
+                        scrollDirection:
+                            Axis.horizontal,
+
+                        child: Row(
+
+                          children:
+                              images.map<Widget>(
+                            (img){
+
+                              return Padding(
+
+                                padding:
+                                    const EdgeInsets
+                                        .only(
+                                            right:10),
+
+                                child: GestureDetector(
+
+                                  onTap: () {
+
+                                    showDialog(
+
+                                      context:
+                                          context,
+
+                                      builder: (_){
+
+                                        return Dialog(
+
+                                          backgroundColor:
+                                              Colors
+                                                  .black,
+
+                                          child:
+                                              InteractiveViewer(
+
+                                            child:
+                                                Image.network(
+                                              img,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  },
+
+                                  child:
+                                      ClipRRect(
+
+                                    borderRadius:
+                                        BorderRadius
+                                            .circular(
+                                                14),
+
+                                    child:
+                                        CachedNetworkImage(
+
+                                      imageUrl:
+                                          img,
+
+                                      width: 110,
+                                      height: 140,
+
+                                      fit:
+                                          BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ).toList(),
+                        ),
+                      ),
+                    )
+                ],
+              ),
+            );
+
+          }).toList()
+      ],
+    ),
+  );
 }
 
 Widget _helpSection(){

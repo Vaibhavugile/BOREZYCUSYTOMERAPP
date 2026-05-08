@@ -229,50 +229,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                       const SizedBox(height: 20),
 
-                      const Text("Select Size",
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-
-                      const SizedBox(height: 10),
-
-                      Row(
-                        children: List.generate(sizes.length, (index) {
-                          final isSelected = selectedSize == index;
-
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                selectedSize = index;
-                              });
-                            },
-                            child: Container(
-                              margin: const EdgeInsets.only(right: 10),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: isSelected
-                                      ? Colors.deepPurple
-                                      : Colors.grey,
-                                ),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(sizes[index]),
-                            ),
-                          );
-                        }),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      const Text(
-                        "ABOUT THIS OUTFIT",
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      const Text(
-                        "Premium outfit perfect for weddings and events.",
-                      ),
+                      
                     ],
                   ),
                 ),
