@@ -1,6 +1,5 @@
 import UIKit
 import Flutter
-import Firebase
 import FirebaseMessaging
 import UserNotifications
 
@@ -12,9 +11,7 @@ import UserNotifications
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
 
-    FirebaseApp.configure()
-
-    // Notification Permission
+    // 🔔 Notification Permission
     UNUserNotificationCenter.current().delegate = self
 
     let authOptions: UNAuthorizationOptions = [
@@ -30,6 +27,7 @@ import UserNotifications
 
     application.registerForRemoteNotifications()
 
+    // 🔥 FCM Delegate
     Messaging.messaging().delegate = self
 
     GeneratedPluginRegistrant.register(with: self)
@@ -40,7 +38,7 @@ import UserNotifications
     )
   }
 
-  // FCM Token
+  // 🔥 FCM TOKEN
   func messaging(
     _ messaging: Messaging,
     didReceiveRegistrationToken fcmToken: String?
@@ -48,7 +46,7 @@ import UserNotifications
     print("FCM TOKEN: \(fcmToken ?? "")")
   }
 
-  // Foreground Notification
+  // 🔥 Foreground Notification
   override func userNotificationCenter(
     _ center: UNUserNotificationCenter,
     willPresent notification: UNNotification,
