@@ -9,7 +9,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_gradients.dart';
 import '../services/tenant_config.dart';
 import '../services/user_helper.dart';
-
+import 'credit_history_screen.dart';
 import 'booking_list_screen.dart';
 import 'wishlist_screen.dart';
 
@@ -24,6 +24,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   int points = 0;
   int rentals = 0;
+  int wishlistCount = 0;
 bool isEditingName = false;
   String customerName = "Customer";
   String profileImageUrl = "";
@@ -65,12 +66,56 @@ bool isEditingName = false;
 
       nameController.text = customerName;
 
-      final branchStats = data["branchStats"] ?? {};
-      final currentBranchStats = branchStats[branch] ?? {};
+      /* =====================================================
+   RENTALS
+===================================================== */
 
-      rentals = currentBranchStats["receipts"] ?? 0;
-      points =
-          (currentBranchStats["creditBalance"] ?? 0).toInt();
+final branchStats =
+    data["branchStats"] ?? {};
+
+final currentBranchStats =
+    branchStats[branch] ?? {};
+
+rentals =
+    currentBranchStats["receipts"] ?? 0;
+
+/* =====================================================
+   WALLET BALANCE
+===================================================== */
+
+final creditQuery =
+    await FirebaseFirestore.instance
+        .collection("products")
+        .doc(branch)
+        .collection("creditNotes")
+        .where(
+          "mobileNumber",
+          isEqualTo: cleanPhone,
+        )
+        .limit(1)
+        .get();
+
+if (creditQuery.docs.isNotEmpty) {
+
+  final creditData =
+      creditQuery.docs.first.data();
+
+  points =
+      (creditData["Balance"] ?? 0)
+          .toInt();
+}
+
+final wishlistSnapshot =
+    await FirebaseFirestore.instance
+        .collection("customers")
+        .doc(branch)
+        .collection("users")
+        .doc(cleanPhone)
+        .collection("wishlist")
+        .get();
+
+wishlistCount =
+    wishlistSnapshot.docs.length;
     }
 
     setState(() {
@@ -250,13 +295,9 @@ bool isEditingName = false;
           ),
         ),
 
-        leading: const Icon(Icons.menu),
 
         actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 12),
-            child: Icon(Icons.shopping_bag_outlined),
-          )
+          
         ],
       ),
 
@@ -462,63 +503,363 @@ if (isEditingName)
                   const SizedBox(height: 20),
 
                   /// 🔥 STATS
-                  Row(
-                    mainAxisAlignment:
-                        MainAxisAlignment.spaceEvenly,
+               Row(
 
-                    children: [
+  mainAxisAlignment:
+      MainAxisAlignment.spaceEvenly,
 
-                      Column(
-                        children: [
-                          Text(
-                            "$rentals",
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight:
-                                  FontWeight.bold,
-                            ),
-                          ),
-                          const Text("RENTALS")
-                        ],
-                      ),
+  children: [
 
-                      const Column(
-                        children: [
-                          Text(
-                            "0",
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight:
-                                  FontWeight.bold,
-                            ),
-                          ),
-                          Text("WISHLIST")
-                        ],
-                      ),
+    /* =====================================================
+       RENTALS
+    ===================================================== */
 
-                      Column(
-                        children: [
-                          Text(
-                            "$points",
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight:
-                                  FontWeight.bold,
-                            ),
-                          ),
+    GestureDetector(
 
-                          const Text(
-                            "POINTS",
-                            style: TextStyle(
-                              fontSize: 12,
-                              letterSpacing: 1.2,
-                              color: Colors.black54,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  )
+      onTap: () {
+
+        Navigator.push(
+
+          context,
+
+          MaterialPageRoute(
+
+            builder: (_) =>
+                const BookingListScreen(),
+          ),
+        );
+      },
+
+      child: Column(
+
+        children: [
+
+          Container(
+
+            padding:
+                const EdgeInsets.all(14),
+
+            decoration: BoxDecoration(
+
+              gradient:
+                  const LinearGradient(
+
+                colors: [
+
+                  Color(0xFFE8F1FF),
+
+                  Color(0xFFD9E8FF),
+                ],
+              ),
+
+              borderRadius:
+                  BorderRadius.circular(20),
+
+              boxShadow: [
+
+                BoxShadow(
+
+                  blurRadius: 10,
+
+                  color: Colors.blue
+                      .withOpacity(.12),
+                )
+              ],
+            ),
+
+            child: Column(
+
+              children: [
+
+                const Icon(
+
+                  Icons.calendar_month_rounded,
+
+                  color:
+                      Color(0xFF2563EB),
+
+                  size: 22,
+                ),
+
+                const SizedBox(height: 6),
+
+                Text(
+
+                  "$rentals",
+
+                  style: const TextStyle(
+
+                    fontSize: 22,
+
+                    fontWeight:
+                        FontWeight.bold,
+
+                    color:
+                        Color(0xFF1F2937),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          const Text(
+
+            "RENTALS",
+
+            style: TextStyle(
+
+              fontSize: 12,
+
+              letterSpacing: 1.2,
+
+              color: Colors.black54,
+
+              fontWeight:
+                  FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    ),
+
+    /* =====================================================
+       WISHLIST
+    ===================================================== */
+
+    GestureDetector(
+
+      onTap: () {
+
+        Navigator.push(
+
+          context,
+
+          MaterialPageRoute(
+
+            builder: (_) =>
+                const WishlistScreen(),
+          ),
+        );
+      },
+
+      child: Column(
+
+        children: [
+
+          Container(
+
+            padding:
+                const EdgeInsets.all(14),
+
+            decoration: BoxDecoration(
+
+              gradient:
+                  const LinearGradient(
+
+                colors: [
+
+                  Color(0xFFFFEEF1),
+
+                  Color(0xFFFFDDE4),
+                ],
+              ),
+
+              borderRadius:
+                  BorderRadius.circular(20),
+
+              boxShadow: [
+
+                BoxShadow(
+
+                  blurRadius: 10,
+
+                  color: Colors.pink
+                      .withOpacity(.12),
+                )
+              ],
+            ),
+
+            child: Column(
+
+              children: [
+
+                const Icon(
+
+                  Icons.favorite_rounded,
+
+                  color:
+                      Color(0xFFE11D48),
+
+                  size: 22,
+                ),
+
+                const SizedBox(height: 6),
+
+                Text(
+
+  "$wishlistCount",
+
+  style: const TextStyle(
+
+    fontSize: 22,
+
+    fontWeight:
+        FontWeight.bold,
+
+    color:
+        Color(0xFF1F2937),
+  ),
+),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          const Text(
+
+            "WISHLIST",
+
+            style: TextStyle(
+
+              fontSize: 12,
+
+              letterSpacing: 1.2,
+
+              color: Colors.black54,
+
+              fontWeight:
+                  FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    ),
+
+    /* =====================================================
+       POINTS / WALLET
+    ===================================================== */
+
+    GestureDetector(
+
+      onTap: () async {
+
+        final phone =
+            await UserHelper.getPhone();
+
+        if (phone == null) return;
+
+        Navigator.push(
+
+          context,
+
+          MaterialPageRoute(
+
+            builder: (_) =>
+                CreditHistoryScreen(
+              mobileNumber: phone,
+            ),
+          ),
+        );
+      },
+
+      child: Column(
+
+        children: [
+
+          Container(
+
+            padding:
+                const EdgeInsets.all(14),
+
+            decoration: BoxDecoration(
+
+              gradient:
+                  const LinearGradient(
+
+                colors: [
+
+                  Color(0xFFFFF4D6),
+
+                  Color(0xFFFDE7B0),
+                ],
+              ),
+
+              borderRadius:
+                  BorderRadius.circular(20),
+
+              boxShadow: [
+
+                BoxShadow(
+
+                  blurRadius: 10,
+
+                  color: Colors.amber
+                      .withOpacity(.18),
+                )
+              ],
+            ),
+
+            child: Column(
+
+              children: [
+
+                const Icon(
+
+                  Icons.account_balance_wallet_rounded,
+
+                  color:
+                      Color(0xFFC69214),
+
+                  size: 22,
+                ),
+
+                const SizedBox(height: 6),
+
+                Text(
+
+                  "$points",
+
+                  style: const TextStyle(
+
+                    fontSize: 22,
+
+                    fontWeight:
+                        FontWeight.bold,
+
+                    color:
+                        Color(0xFF1F2937),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          const Text(
+
+            "POINTS",
+
+            style: TextStyle(
+
+              fontSize: 12,
+
+              letterSpacing: 1.2,
+
+              color: Colors.black54,
+
+              fontWeight:
+                  FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    ),
+  ],
+),
                 ],
               ),
             ),

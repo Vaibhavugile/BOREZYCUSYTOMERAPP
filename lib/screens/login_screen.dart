@@ -225,42 +225,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
 
-                    const SizedBox(height: 30),
-
-                    /// SOCIAL LOGIN
-                    Row(
-                      children: const [
-                        Expanded(child: Divider()),
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 12),
-                          child: Text("SOCIAL LOGIN"),
-                        ),
-                        Expanded(child: Divider()),
-                      ],
-                    ),
+                  
 
                     const SizedBox(height: 20),
 
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: isLoading ? null : () {},
-                            child: const Text("Google"),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: isLoading ? null : () {},
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
-                            ),
-                            child: const Text("Facebook"),
-                          ),
-                        )
-                      ],
-                    ),
+                    
 
                   ],
                 ),
@@ -269,21 +238,8 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 30),
 
               /// CREATE ACCOUNT
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text("New to ${TenantConfig.appName}? "),
-                  const Text(
-                    "Create Account",
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
-                ],
-              ),
+             
 
-              const SizedBox(height: 20),
 
               const Text(
                 "Privacy Policy • Terms of Service",
