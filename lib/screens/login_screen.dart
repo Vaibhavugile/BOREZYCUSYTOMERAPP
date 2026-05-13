@@ -30,12 +30,28 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       return;
     }
+    /// 🔥 APPLE REVIEW TEST ACCOUNT
+if (phone == "9999999999") {
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => OtpScreen(
+        authService: authService,
+        phone: phone,
+      ),
+    ),
+  );
+
+  return;
+}
 
     if (isLoading) return;
 
     setState(() {
       isLoading = true;
     });
+
 
     try {
       await authService.sendOtp(

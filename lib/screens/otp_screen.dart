@@ -92,6 +92,28 @@ void verifyOtp() async {
 
   bool showRewardPopup = false;
   int rewardAmount = 0;
+  /// 🔥 APPLE REVIEW OTP BYPASS
+if (widget.phone == "9999999999" &&
+    otpCode == "123456") {
+
+  final phone = "9999999999";
+
+  await FirebaseAuth.instance.signInAnonymously();
+
+  await UserHelper.setPhone(phone);
+
+  if (!mounted) return;
+
+  Navigator.pushAndRemoveUntil(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const MainScreen(),
+    ),
+    (route) => false,
+  );
+
+  return;
+}
 
   try {
     /// 🔥 STEP 1: VERIFY OTP
