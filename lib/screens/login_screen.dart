@@ -4,6 +4,10 @@ import '../theme/app_colors.dart';
 import '../theme/app_gradients.dart';
 import 'otp_screen.dart';
 import '../services/tenant_config.dart';
+import'main_screen.dart';
+import '../providers/home_provider.dart'; 
+import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,6 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final authService = AuthService();
 
   bool isLoading = false;
+  bool guestLoading = false;
 
   void sendOtp() async {
 
@@ -244,7 +249,89 @@ if (phone == "9999999999") {
                   
 
                     const SizedBox(height: 20),
+TextButton(
 
+  onPressed: guestLoading
+      ? null
+      : () async {
+
+          setState(() {
+            guestLoading = true;
+          });
+
+          try {
+
+            /// 🔥 GUEST AUTH
+            await FirebaseAuth.instance
+                .signInAnonymously();
+
+            /// 🔥 LOAD HOME DATA
+            final homeProvider =
+                Provider.of<HomeProvider>(
+              context,
+              listen: false,
+            );
+
+            await homeProvider.loadHomeData();
+
+            if (!mounted) return;
+
+            /// 🔥 NAVIGATE
+            Navigator.pushReplacement(
+
+              context,
+
+              MaterialPageRoute(
+                builder: (_) =>
+                    const MainScreen(),
+              ),
+            );
+
+          } catch (e) {
+
+            ScaffoldMessenger.of(context)
+                .showSnackBar(
+
+              SnackBar(
+                content: Text(
+                  "Failed: $e",
+                ),
+              ),
+            );
+
+          } finally {
+
+            if (mounted) {
+
+              setState(() {
+                guestLoading = false;
+              });
+            }
+          }
+        },
+
+  child: guestLoading
+
+      ? const SizedBox(
+
+          height: 20,
+          width: 20,
+
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+          ),
+        )
+
+      : const Text(
+
+          "Continue as Guest",
+
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+),
                     
 
                   ],

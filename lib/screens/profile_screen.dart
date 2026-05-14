@@ -231,6 +231,115 @@ wishlistCount =
       savingProfile = false;
     });
   }
+  void showDeleteAccountDialog() {
+
+  showDialog(
+
+    context: context,
+
+    builder: (_) => AlertDialog(
+
+      title: const Text(
+        "Delete Account",
+      ),
+
+      content: const Text(
+        "Your account will be scheduled for deletion and permanently removed after 7 days.\n\n"
+        "You can cancel this anytime by logging in again before the deletion date."
+      ),
+
+      actions: [
+
+        TextButton(
+
+          onPressed: () {
+            Navigator.pop(context);
+          },
+
+          child: const Text("Cancel"),
+        ),
+
+        TextButton(
+
+          onPressed: () async {
+
+            Navigator.pop(context);
+
+            await requestAccountDeletion();
+
+          },
+
+          child: const Text(
+            "Delete",
+            style: TextStyle(
+              color: Colors.red,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+Future<void> requestAccountDeletion() async {
+
+  try {
+
+    final phone =
+        await UserHelper.getPhone();
+
+    if (phone == null) return;
+
+    final branch =
+        TenantConfig.branchCode;
+
+    final deletionDate =
+        DateTime.now().add(
+      const Duration(days: 7),
+    );
+
+    await FirebaseFirestore.instance
+        .collection("customers")
+        .doc(branch)
+        .collection("users")
+        .doc(phone)
+        .set({
+
+      "deletionRequested": true,
+
+      "deletionRequestedAt":
+          FieldValue.serverTimestamp(),
+
+      "deletionDate":
+          Timestamp.fromDate(deletionDate),
+
+    }, SetOptions(merge: true));
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+
+      const SnackBar(
+
+        content: Text(
+          "Account scheduled for deletion in 7 days",
+        ),
+      ),
+    );
+
+  } catch (e) {
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+
+      SnackBar(
+        content: Text(
+          "Failed: $e",
+        ),
+      ),
+    );
+  }
+}
 
   /// 🔥 MENU ITEM
   Widget buildMenuItem({
@@ -961,7 +1070,40 @@ if (isEditingName)
                     subtitle:
                         "24/7 concierge assistance",
                   ),
+const Divider(),
 
+ListTile(
+
+  onTap: () {
+    showDeleteAccountDialog();
+  },
+
+  leading: Container(
+    padding: const EdgeInsets.all(12),
+
+    decoration: BoxDecoration(
+      color: Colors.red.shade50,
+      borderRadius: BorderRadius.circular(14),
+    ),
+
+    child: const Icon(
+      Icons.delete_forever,
+      color: Colors.red,
+    ),
+  ),
+
+  title: const Text(
+    "Delete Account",
+    style: TextStyle(
+      color: Colors.red,
+      fontWeight: FontWeight.w600,
+    ),
+  ),
+
+  subtitle: const Text(
+    "Schedule permanent account deletion",
+  ),
+),
                   const Divider(),
 
                   ListTile(
