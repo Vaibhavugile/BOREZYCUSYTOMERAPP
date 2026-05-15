@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
-
+import 'package:shared_preferences/shared_preferences.dart';
 class AuthService {
 
   String? _currentOtp;
@@ -19,11 +19,15 @@ class AuthService {
     required Function() codeSent,
   }) async {
 
-    final otp = _generateOtp();
+   final otp = _generateOtp();
 
-    /// 🔐 STORE TEMP (basic version)
-    _currentOtp = otp;
-    _currentPhone = phone;
+final prefs = await SharedPreferences.getInstance();
+
+await prefs.setString("otp_phone", phone);
+await prefs.setString("otp_code", otp);
+
+_currentOtp = otp;
+_currentPhone = phone;
 
     final url = Uri.parse(
       "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
@@ -82,11 +86,25 @@ class AuthService {
 
   /// 🔍 VERIFY OTP (MANUAL)
   Future<void> verifyOtp(String phone, String otp) async {
-    if (_currentPhone == phone && _currentOtp == otp) {
-      print("✅ OTP Verified");
-      return;
-    } else {
-      throw Exception("Invalid OTP");
-    }
+
+  final prefs = await SharedPreferences.getInstance();
+
+  final savedPhone = prefs.getString("otp_phone");
+  final savedOtp = prefs.getString("otp_code");
+
+  print("Saved OTP: $savedOtp");
+  print("Entered OTP: $otp");
+
+  if (savedPhone == phone && savedOtp == otp) {
+
+    await prefs.remove("otp_phone");
+    await prefs.remove("otp_code");
+
+    print("✅ OTP Verified");
+    return;
+
+  } else {
+    throw Exception("Invalid OTP");
   }
+}
 }

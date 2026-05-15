@@ -64,12 +64,12 @@
 	<true/>
 
 	<!-- Firebase -->
-	<key>FirebaseAppDelegateProxyEnabled</key>
-	<false/>
+	<!-- <key>FirebaseAppDelegateProxyEnabled</key>
+	<false/> -->
 
 	<!-- Notification Permission -->
-	<key>NSUserNotificationUsageDescription</key>
-	<string>This app uses notifications for order updates.</string>
+	<key>NSUserNotificationsUsageDescription</key>
+<string>This app uses notifications for order updates.</string>
 
 	<!-- Background Notifications -->
 	<key>UIBackgroundModes</key>
