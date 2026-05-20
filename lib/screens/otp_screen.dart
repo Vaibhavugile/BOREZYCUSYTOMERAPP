@@ -117,8 +117,14 @@ if (widget.phone == "9999999999" &&
 
   try {
     /// 🔥 STEP 1: VERIFY OTP
-    await widget.authService.verifyOtp(widget.phone, otpCode);
+print("========== VERIFY START ==========");
+print("PHONE: ${widget.phone}");
+print("OTP: $otpCode");
 
+await widget.authService.verifyOtp(
+  widget.phone,
+  otpCode,
+);
     /// 🔥 STEP 2: NORMALIZE PHONE
     final phone = normalizePhone(widget.phone);
 
@@ -271,15 +277,22 @@ if (widget.phone == "9999999999" &&
       });
     }
 
-  } catch (e) {
-    if (!mounted) return;
+  } catch (e, stack) {
 
-    shakeController.forward(from: 0);
+  if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Invalid OTP")),
-    );
-  } finally {
+  print("========== OTP VERIFY ERROR ==========");
+  print(e);
+  print(stack);
+
+  shakeController.forward(from: 0);
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(e.toString()),
+    ),
+  );
+} finally {
     if (mounted) {
       setState(() {
         loading = false;

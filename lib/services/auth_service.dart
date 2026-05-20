@@ -85,15 +85,22 @@ _currentPhone = phone;
   }
 
   /// 🔍 VERIFY OTP (MANUAL)
-  Future<void> verifyOtp(String phone, String otp) async {
+Future<void> verifyOtp(String phone, String otp) async {
 
   final prefs = await SharedPreferences.getInstance();
 
   final savedPhone = prefs.getString("otp_phone");
   final savedOtp = prefs.getString("otp_code");
 
+  print("========== VERIFY DEBUG ==========");
+  print("Saved Phone: $savedPhone");
+  print("Entered Phone: $phone");
+
   print("Saved OTP: $savedOtp");
   print("Entered OTP: $otp");
+
+  print("Phone Match: ${savedPhone == phone}");
+  print("OTP Match: ${savedOtp == otp}");
 
   if (savedPhone == phone && savedOtp == otp) {
 
@@ -104,7 +111,11 @@ _currentPhone = phone;
     return;
 
   } else {
-    throw Exception("Invalid OTP");
+
+    throw Exception(
+      "Phone Match: ${savedPhone == phone}, "
+      "OTP Match: ${savedOtp == otp}",
+    );
   }
 }
 }
