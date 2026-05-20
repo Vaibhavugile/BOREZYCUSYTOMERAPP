@@ -42,6 +42,8 @@ workflows:
 
     artifacts:
       - build/ios/ipa/*.ipa
+      - build/ios/archive/*.xcarchive
+      - /Users/builder/clone/build/ios/ipa/*.ipa
 
     cache:
       cache_paths:
