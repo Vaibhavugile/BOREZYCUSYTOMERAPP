@@ -1,3 +1,4 @@
+install! 'cocoapods', :disable_input_output_paths => true
 platform :ios, '13.0'
 
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
