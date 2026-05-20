@@ -6,7 +6,7 @@ workflows:
 
     environment:
       flutter: stable
-      xcode: latest
+      xcode: 15.4
 
     scripts:
       - name: Flutter clean
@@ -30,7 +30,7 @@ workflows:
 
       - name: Build IPA
         script: |
-          flutter build ipa --release --no-swift-package-manager
+          flutter build ipa --release
 
     artifacts:
       - build/ios/ipa/*.ipa
