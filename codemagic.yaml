@@ -6,7 +6,7 @@ workflows:
 
     environment:
       flutter: stable
-      xcode: 15.4
+      xcode: 15.2
 
     scripts:
       - name: Flutter clean
