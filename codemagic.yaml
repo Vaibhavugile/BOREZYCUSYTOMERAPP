@@ -36,13 +36,8 @@ workflows:
 
       - name: Build IPA
         script: |
-          flutter build ipa --release --no-codesign
-
-      - name: Export signed IPA
-        script: |
-          xcode-project build-ipa \
-            --workspace ios/Runner.xcworkspace \
-            --scheme Runner
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist
 
     artifacts:
       - build/ios/ipa/*.ipa
