@@ -9,6 +9,10 @@ workflows:
       xcode: latest
       cocoapods: default
 
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.dor.customeapp
+
     scripts:
       - name: Flutter clean
         script: |
@@ -28,9 +32,7 @@ workflows:
       - name: Install CocoaPods
         script: |
           cd ios
-          pod deintegrate
-          pod setup
-          pod install --repo-update
+          pod install
 
       - name: Build IPA
         script: |
