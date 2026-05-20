@@ -1,1 +1,2 @@
 #include "Generated.xcconfig"
+DISABLE_SWIFT_PACKAGE_MANAGER=YES
