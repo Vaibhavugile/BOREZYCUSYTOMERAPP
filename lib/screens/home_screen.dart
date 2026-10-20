@@ -22,12 +22,71 @@ class _ImagePlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFFF1E9DE),
+      color: const Color(0xFFF5EFE7),
       alignment: Alignment.center,
       child: const Icon(
         Icons.checkroom_outlined,
         color: Color(0xFFB68A52),
         size: 30,
+      ),
+    );
+  }
+}
+
+
+class _PremiumReveal extends StatefulWidget {
+  const _PremiumReveal({
+    required this.child,
+    this.offset = const Offset(0, 0.035),
+  });
+
+  final Widget child;
+  final Offset offset;
+
+  @override
+  State<_PremiumReveal> createState() => _PremiumRevealState();
+}
+
+class _PremiumRevealState extends State<_PremiumReveal>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 620),
+    );
+    _fade = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
+    _slide = Tween<Offset>(
+      begin: widget.offset,
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    ));
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fade,
+      child: SlideTransition(
+        position: _slide,
+        child: widget.child,
       ),
     );
   }
@@ -122,8 +181,8 @@ class _HomeScreenState extends State<HomeScreen>
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [
-            Color(0xFFC8A96B),
-            Color(0xFFE0C48F),
+            Color(0xFF30251F),
+            Color(0xFF76583E),
           ],
         ),
 
@@ -254,14 +313,11 @@ class _HomeScreenState extends State<HomeScreen>
         SliverToBoxAdapter(
           child: Column(
             children: [
-              const SizedBox(height: 16),
-              _searchBar(),
-              const SizedBox(height: 20),
-              _editorialIntro(),
-              const SizedBox(height: 18),
-              _heroSlider(),
-              const SizedBox(height: 24),
-              _rentYourDressBanner(),
+              const SizedBox(height: 2),
+              _PremiumReveal(child: _editorialIntro()),
+              const SizedBox(height: 10),
+              _PremiumReveal(child: _heroSlider()),
+              const SizedBox(height: 12),
             ],
           ),
         ),
@@ -269,17 +325,13 @@ class _HomeScreenState extends State<HomeScreen>
           child: loadRest
               ? Column(
                   children: [
-                    const SizedBox(height: 30),
-                    _collectionsGrid(),
-                    const SizedBox(height: 36),
-                    _promotionsSlider(),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 2),
+                    _PremiumReveal(child: _collectionsGrid()),
+                    const SizedBox(height: 24),
                     _miniTrendSlider(),
-                    const SizedBox(height: 30),
-                    _occasionCarousel(),
-                    const SizedBox(height: 36),
-                    _topStoriesSlider(),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 16),
+                    _PremiumReveal(child: _dorExperienceSection()),
+                    const SizedBox(height: 24),
                   ],
                 )
               : const Padding(
@@ -311,7 +363,7 @@ class _HomeScreenState extends State<HomeScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'THE DOR EDIT',
+                  'DOR • THE RENTAL EDIT',
                   style: TextStyle(
                     color: _gold,
                     fontSize: 10,
@@ -321,18 +373,18 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 const SizedBox(height: 7),
                 const Text(
-                  'Make every moment\\nlook unforgettable.',
+                  'Luxury looks.\\nLighter living.',
                   style: TextStyle(
                     color: _ink,
-                    fontSize: 25,
-                    height: 1.12,
+                    fontSize: 24,
+                    height: 1.08,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: -0.8,
+                    letterSpacing: -0.9,
                   ),
                 ),
                 const SizedBox(height: 7),
                 const Text(
-                  'Discover your next occasion look.',
+                  'Discover your next signature look.',
                   style: TextStyle(
                     color: _muted,
                     fontSize: 12,
@@ -463,7 +515,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
 
             decoration: BoxDecoration(
-              color: Colors.red,
+              color: _gold,
               borderRadius: BorderRadius.circular(20),
             ),
 
@@ -634,7 +686,20 @@ class _HomeScreenState extends State<HomeScreen>
         children: [
 
           /// ❤️ ICON
-          const Icon(Icons.favorite_border, size: 26),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _line),
+            ),
+            child: const Icon(
+              Icons.favorite_border_rounded,
+              size: 21,
+              color: _ink,
+            ),
+          ),
 
           /// 🔴 BADGE
           if (count > 0)
@@ -678,139 +743,6 @@ class _HomeScreenState extends State<HomeScreen>
     ),
   );
 }
-  Widget _searchBar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          height: 54,
-          padding: const EdgeInsets.symmetric(horizontal: 15),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: _line),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF33251D).withOpacity(0.035),
-                blurRadius: 18,
-                offset: const Offset(0, 7),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.search_rounded, color: _gold, size: 22),
-              const SizedBox(width: 11),
-              const Expanded(
-                child: Text(
-                  'Find your perfect look...',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: _muted,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: _softGold,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.tune_rounded,
-                  color: _gold,
-                  size: 18,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-Widget _topStoriesSlider() {
-
-
-  final stories = [
-  "https://firebasestorage.googleapis.com/v0/b/renting-wala-27d06.appspot.com/o/products%2F7007%2F3445567%2F1777542192372-h111.webp?alt=media&token=38bd2dab-9947-44fd-848d-282e23c6744a",
-"https://firebasestorage.googleapis.com/v0/b/renting-wala-27d06.appspot.com/o/products%2F7007%2F3445567%2F1777542198607-h133.webp?alt=media&token=ba683a47-4c3c-4542-af91-4fbe7b96dffe",
-"https://firebasestorage.googleapis.com/v0/b/renting-wala-27d06.appspot.com/o/products%2F7007%2F3445567%2F1777542203558-h211.webp?alt=media&token=be4eac36-df8d-4b36-891a-37990e7a35bc",
-"https://firebasestorage.googleapis.com/v0/b/renting-wala-27d06.appspot.com/o/products%2F7007%2F3445567%2F1777542209121-h222.webp?alt=media&token=8030ffc6-ed26-4dfc-b625-f3fd0a7602aa",
-"https://firebasestorage.googleapis.com/v0/b/renting-wala-27d06.appspot.com/o/products%2F7007%2F3445567%2F1777542216342-h1422.webp?alt=media&token=6e5b7eb4-56f7-45ea-9385-535ea9ae9acc",
-    "https://images.openai.com/static-rsc-4/mGqToIqQX0anumZAFEcDuYirLwMUQcpASgyLFXZZi4r1XsJi5Y2W_m8hueDROjHCv3en_kjIctrCvG1LcD3EHqZEYoAJTh116vDhw41NEeHG3YJGkEV3nnMCF3lEdXkE4vURLNXmzIKiekAb5UDJroGiA-8pBW0dsxfHpwTiuz10XHBZP1-UNLyGla-uYDJb?purpose=fullsize",
-    "https://images.openai.com/static-rsc-4/_c9NVpLWJfDYhJWc4IY56LPDaSOzNj6rMrAM7NpCQ0HIvtahOaLsJBtC79pJ7DuWn_A64mqthAEgdrD0fzBTvcVLrZ4cy6t9ttUqdHr_HSOfmfCPq6ZxBehI5FF4aQposefR22Pv_MNrltgd2UgoPpONMJGCtkXT575dzQatV1p7-xnCnz6yoAMMoGW1OxJb?purpose=fullsize",
-
-  ];
-
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-
-      const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-
-            Text(
-              "Stories worth a look",
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            SizedBox(height: 4),
-
-            Text(
-              "Style inspiration, curated for you",
-              style: TextStyle(color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-
-      const SizedBox(height: 16),
-
-      CarouselSlider.builder(
-        itemCount: stories.length,
-
-        options: CarouselOptions(
-          height: 300,
-          viewportFraction: 0.85,
-          enlargeCenterPage: true,
-
-          autoPlay: false,
-          autoPlayInterval: const Duration(seconds: 4),
-          autoPlayAnimationDuration: const Duration(milliseconds: 800),
-          autoPlayCurve: Curves.easeInOut,
-        ),
-
-        itemBuilder: (context, index, realIndex) {
-
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-
-            child: CachedNetworkImage(
-              imageUrl: stories[index] + "&w=400",
-              placeholder: (_, __) => const _ImagePlaceholder(),
-              errorWidget: (_, __, ___) => const _ImagePlaceholder(),
-              fit: BoxFit.cover,
-              width: double.infinity,
-            ),
-          );
-        },
-      ),
-    ],
-  );
-}
-
   /// HERO SLIDER
 Widget _heroSlider() {
 
@@ -827,7 +759,7 @@ Widget _heroSlider() {
         itemCount: banners.length,
 
         options: CarouselOptions(
-          height: 280,
+          height: 228,
           viewportFraction: 1.0,
           autoPlay: false,
           enableInfiniteScroll: true,
@@ -847,7 +779,7 @@ Widget _heroSlider() {
             padding: const EdgeInsets.symmetric(horizontal: 10),
 
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(24),
 
               child: Stack(
                 children: [
@@ -919,15 +851,21 @@ Widget _rentYourDressBanner() {
         );
       },
       child: Container(
-        padding: const EdgeInsets.all(22),
+        padding: const EdgeInsets.fromLTRB(20, 22, 18, 22),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [
-              Color(0xFF30251F),
-              Color(0xFF76583E),
-            ],
+            colors: [Color(0xFF251D19), Color(0xFF6B5038)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF30251F).withOpacity(0.14),
+              blurRadius: 22,
+              offset: const Offset(0, 9),
+            ),
+          ],
         ),
         child: const Row(
           children: [
@@ -936,7 +874,7 @@ Widget _rentYourDressBanner() {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'RENT YOUR DRESS WITH DOR',
+                    'THE DOR WARDROBE CIRCLE',
                     style: TextStyle(
                       color: Color(0xFFE5C995),
                       fontSize: 11,
@@ -962,7 +900,7 @@ Widget _rentYourDressBanner() {
                   ),
                   SizedBox(height: 14),
                   Text(
-                    'EXPLORE THE PROGRAM  →',
+                    'EXPLORE THE PROGRAM  ↗',
                     style: TextStyle(
                       color: Color(0xFFE5C995),
                       fontWeight: FontWeight.bold,
@@ -982,6 +920,154 @@ Widget _rentYourDressBanner() {
         ),
       ),
     ),
+  );
+}
+
+
+Widget _dorExperienceSection() {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1E7D9),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFFE7D9C7)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "STYLE, YOUR WAY",
+                      style: TextStyle(
+                        color: Color(0xFF967044),
+                        fontSize: 9,
+                        letterSpacing: 2,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      "Wear the moment.\\nKeep the memories.",
+                      style: TextStyle(
+                        color: Color(0xFF29221F),
+                        fontSize: 22,
+                        height: 1.13,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.6,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "Your next favourite look is closer than you think.",
+                      style: TextStyle(
+                        color: const Color(0xFF51473F).withOpacity(0.82),
+                        fontSize: 12,
+                        height: 1.45,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                width: 76,
+                height: 92,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF30251F),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(28),
+                    topRight: Radius.circular(28),
+                    bottomLeft: Radius.circular(8),
+                    bottomRight: Radius.circular(28),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.diamond_outlined,
+                  color: Color(0xFFE5C995),
+                  size: 34,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Container(height: 1, color: const Color(0xFFDCCBB5)),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _experiencePoint(
+                  icon: Icons.checkroom_outlined,
+                  title: "Curated looks",
+                  subtitle: "For your plans",
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 42,
+                color: const Color(0xFFDCCBB5),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: _experiencePoint(
+                  icon: Icons.auto_awesome_outlined,
+                  title: "DOR credits",
+                  subtitle: "More wardrobe value",
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _experiencePoint({
+  required IconData icon,
+  required String title,
+  required String subtitle,
+}) {
+  return Row(
+    children: [
+      Icon(icon, size: 20, color: const Color(0xFF967044)),
+      const SizedBox(width: 9),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF29221F),
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              subtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF8E857D),
+                fontSize: 9,
+                height: 1.25,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
   );
 }
 
@@ -1010,23 +1096,71 @@ Widget _miniTrendSlider() {
 
       if (items.isEmpty) return const SizedBox();
 
+      final normalizedTitle = title.toString().toLowerCase();
+      final isWomenSection = normalizedTitle.contains("women") ||
+          normalizedTitle.contains("woman") ||
+          normalizedTitle.contains("ladies") ||
+          normalizedTitle.contains("female");
+      final isMenSection = normalizedTitle.contains("men") ||
+          normalizedTitle.contains("mens") ||
+          normalizedTitle.contains("men's") ||
+          normalizedTitle.contains("gentlemen");
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
 
-          /// TITLE
+          /// EDITORIAL SECTION HEADER — intentionally different from the collection tiles.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isWomenSection ? 'THE WOMEN’S EDIT' :
+                            isMenSection ? 'THE MEN’S EDIT' : 'CURATED SELECTION',
+                        style: const TextStyle(
+                          color: _gold,
+                          fontSize: 9,
+                          letterSpacing: 1.8,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: _ink,
+                          fontSize: 23,
+                          height: 1.0,
+                          letterSpacing: -0.7,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: .25, end: .85),
+                  duration: const Duration(milliseconds: 1500),
+                  curve: Curves.easeInOut,
+                  builder: (context, value, child) => Container(
+                    margin: const EdgeInsets.only(bottom: 3),
+                    width: 42,
+                    height: 1,
+                    color: _gold.withOpacity(value),
+                  ),
+                ),
+              ],
             ),
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
 
           /// SLIDER
           _genderSlider(
@@ -1040,7 +1174,19 @@ Widget _miniTrendSlider() {
             }).toList(),
           ),
 
-          const SizedBox(height: 28),
+          const SizedBox(height: 14),
+          if (isWomenSection) ...[
+            _rentYourDressBanner(),
+            const SizedBox(height: 18),
+          ] else if (isMenSection && !collections.any((doc) {
+            final d = doc.data() as Map<String, dynamic>;
+            final t = (d["title"] ?? "").toString().toLowerCase();
+            return t.contains("women") || t.contains("woman") ||
+                t.contains("ladies") || t.contains("female");
+          })) ...[
+            _rentYourDressBanner(),
+            const SizedBox(height: 18),
+          ],
         ],
       );
     }),
@@ -1060,8 +1206,24 @@ Widget _genderSlider(List<Map<String, dynamic>> items) {
 
         final item = items[index];
 
-        return GestureDetector(
-
+        return TweenAnimationBuilder<double>(
+          key: ValueKey('subcollection-card-${item["subcollectionId"] ?? item["title"]}'),
+          tween: Tween<double>(begin: 0, end: 1),
+          duration: Duration(milliseconds: 520 + (index * 85)),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, child) {
+            return Opacity(
+              opacity: value.clamp(0.0, 1.0).toDouble(),
+              child: Transform.translate(
+                offset: Offset(18 * (1 - value), 0),
+                child: Transform.scale(
+                  scale: 0.97 + (0.03 * value),
+                  child: child,
+                ),
+              ),
+            );
+          },
+          child: GestureDetector(
           onTap: () {
             Navigator.push(
               context,
@@ -1123,334 +1285,12 @@ Widget _genderSlider(List<Map<String, dynamic>> items) {
               ),
             ),
           ),
+          ),
         );
       },
     ),
   );
 }
-Widget _occasionCarousel() {
-
-  final home = Provider.of<HomeProvider>(context);
-  final occasions = home.occasions;
-
-  if (occasions.isEmpty) return const SizedBox();
-
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-
-      /// HEADER
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-
-            const Text(
-              "Dress for the moment",
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 4),
-
-            Text(
-              "Looks for every celebration and every memory",
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 14,
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            Container(
-              height: 4,
-              width: 50,
-              decoration: BoxDecoration(
-                color: _gold,
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ],
-        ),
-      ),
-
-      const SizedBox(height: 20),
-
-      /// 🔥 CAROUSEL
-      CarouselSlider.builder(
-        itemCount: occasions.length,
-
-        options: CarouselOptions(
-          height: 320,
-          viewportFraction: 0.72,
-          enlargeCenterPage: true,
-          autoPlay: false,
-        ),
-
-        itemBuilder: (context, index, realIndex) {
-
-          final item = occasions[index].data() as Map<String, dynamic>;
-
-          return _occasionCard(
-            item["title"] ?? "",
-            item["subtitle"] ?? "",
-            item["imageUrl"] ?? "",
-          );
-        },
-      ),
-
-      const SizedBox(height: 10),
-    ],
-  );
-}
-Widget _occasionCard(String title, String subtitle, String image) {
-
-  return Container(
-    margin: const EdgeInsets.symmetric(horizontal: 6),
-
-    decoration: BoxDecoration(
-      borderRadius: const BorderRadius.only(
-        topLeft: Radius.circular(30),
-        topRight: Radius.circular(10),
-        bottomLeft: Radius.circular(10),
-        bottomRight: Radius.circular(30),
-      ),
-      boxShadow: [
-        BoxShadow(
-          blurRadius: 10, // 🔥 reduced (performance)
-          color: Colors.black.withOpacity(.12),
-          offset: const Offset(0, 6),
-        )
-      ],
-    ),
-
-    child: ClipRRect(
-      borderRadius: const BorderRadius.only(
-        topLeft: Radius.circular(30),
-        topRight: Radius.circular(10),
-        bottomLeft: Radius.circular(10),
-        bottomRight: Radius.circular(30),
-      ),
-
-      child: Stack(
-        children: [
-
-          /// 🔥 OPTIMIZED IMAGE
-          CachedNetworkImage(
-            imageUrl: image,
-            placeholder: (_, __) => const _ImagePlaceholder(),
-            errorWidget: (_, __, ___) => const _ImagePlaceholder(),
-            width: double.infinity,
-            height: double.infinity,
-            fit: BoxFit.cover,
-          ),
-
-          /// 🔥 GRADIENT
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.black.withOpacity(.7),
-                  Colors.transparent
-                ],
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-              ),
-            ),
-          ),
-
-          /// 🔥 TEXT
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
-                const SizedBox(height: 6),
-
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          )
-        ],
-      ),
-    ),
-  );
-}
-Widget _promotionsSlider() {
-
-  final home = Provider.of<HomeProvider>(context);
-  final promos = home.promotions;
-
-  if (promos.isEmpty) return const SizedBox();
-
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-
-      const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 20),
-        child: Text(
-          "Offers picked for you",
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-
-      const SizedBox(height: 16),
-
-      CarouselSlider.builder(
-        itemCount: promos.length,
-
-        options: CarouselOptions(
-          height: 170,
-          viewportFraction: 0.9,
-          enlargeCenterPage: true,
-          autoPlay: false,
-        ),
-
-        itemBuilder: (context, index, realIndex) {
-
-          final item = promos[index].data() as Map<String, dynamic>;
-
-          return _promotionCard(
-            item["title"] ?? "",
-            item["subtitle"] ?? "",
-            item["discount"] ?? "",
-            item["imageUrl"] ?? "",
-          );
-        },
-      ),
-    ],
-  );
-}
-Widget _promotionCard(
-  String title,
-  String subtitle,
-  String discount,
-  String image,
-) {
-  return Container(
-    margin: const EdgeInsets.symmetric(horizontal: 6),
-
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(20),
-
-      /// 🔥 lighter shadow (performance)
-      boxShadow: [
-        BoxShadow(
-          blurRadius: 10,
-          color: Colors.black.withOpacity(.12),
-          offset: const Offset(0, 6),
-        )
-      ],
-    ),
-
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-
-      child: Stack(
-        children: [
-
-          /// 🔥 optimized image
-          CachedNetworkImage(
-            imageUrl: image,
-            placeholder: (_, __) => const _ImagePlaceholder(),
-            errorWidget: (_, __, ___) => const _ImagePlaceholder(),
-            fit: BoxFit.cover,
-            width: double.infinity,
-            height: double.infinity,
-          ),
-
-          /// gradient
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.black.withOpacity(.6),
-                  Colors.transparent
-                ],
-                begin: Alignment.bottomLeft,
-                end: Alignment.topRight,
-              ),
-            ),
-          ),
-
-          Positioned(
-            left: 16,
-            bottom: 16,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
-                const SizedBox(height: 2),
-
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                  ),
-                ),
-
-                const SizedBox(height: 6),
-
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    discount,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
   /// CATEGORY ICONS
   
 
@@ -1470,39 +1310,62 @@ Widget _promotionCard(
       children: [
 
         const Text(
-          "Explore collections",
+          "THE COLLECTION ATELIER",
           style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
+            fontSize: 21,
+            letterSpacing: -0.4,
+            fontWeight: FontWeight.w800,
           ),
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
 
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
+          // Prevent GridView from inheriting the screen's top/bottom
+          // MediaQuery padding, which creates large blank gaps here.
+          padding: EdgeInsets.zero,
 
           itemCount: collections.length,
 
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: collections.length <= 2 ? 1 : 2,
+            crossAxisCount: collections.length == 1 ? 1 : 2,
             crossAxisSpacing: 14,
             mainAxisSpacing: 14,
 
             /// 🔥 better sizing
-            childAspectRatio: collections.length <= 2 ? 1.65 : 0.82,
+            childAspectRatio: collections.length == 1 ? 1.45 : 0.90,
           ),
 
           itemBuilder: (context, index) {
 
             final data = collections[index].data() as Map<String, dynamic>;
-final doc = collections[index];
-           return _collectionCard(
-  data["title"] ?? "",
-  data["imageUrl"] ?? "",
-  doc.id,
-);
+            final doc = collections[index];
+
+            return TweenAnimationBuilder<double>(
+              key: ValueKey('collection-card-${doc.id}'),
+              tween: Tween<double>(begin: 0, end: 1),
+              duration: Duration(milliseconds: 620 + (index * 110)),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, child) {
+                return Opacity(
+                  opacity: value.clamp(0.0, 1.0).toDouble(),
+                  child: Transform.translate(
+                    offset: Offset(0, 22 * (1 - value)),
+                    child: Transform.scale(
+                      scale: 0.965 + (0.035 * value),
+                      child: child,
+                    ),
+                  ),
+                );
+              },
+              child: _collectionCard(
+                data["title"] ?? "",
+                data["imageUrl"] ?? "",
+                doc.id,
+              ),
+            );
           },
         ),
       ],
@@ -1587,10 +1450,10 @@ void showNotificationsSheet() {
       return Container(
         height: MediaQuery.of(context).size.height * .78,
 
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(22, 16, 22, 24),
 
         decoration: const BoxDecoration(
-          color: Colors.white,
+          color: _canvas,
 
           borderRadius: BorderRadius.vertical(
             top: Radius.circular(30),
