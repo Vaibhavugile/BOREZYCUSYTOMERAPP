@@ -1,121 +1,108 @@
+
 import 'dart:convert';
 import 'dart:math';
+
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-class AuthService {
 
+class AuthService {
   String? _currentOtp;
   String? _currentPhone;
 
-  /// 🔢 GENERATE OTP
+  /// Generate a six-digit OTP.
   String _generateOtp() {
-    final random = Random();
+    final random = Random.secure();
     return (100000 + random.nextInt(900000)).toString();
   }
 
-  /// 📤 SEND OTP VIA MSG91 WHATSAPP
+  /// Send OTP using MSG91 WhatsApp template.
   Future<void> sendOtp({
     required String phone,
     required Function() codeSent,
   }) async {
+    final otp = _generateOtp();
 
-   final otp = _generateOtp();
+    final prefs = await SharedPreferences.getInstance();
 
-final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('otp_phone', phone);
+    await prefs.setString('otp_code', otp);
 
-await prefs.setString("otp_phone", phone);
-await prefs.setString("otp_code", otp);
-
-_currentOtp = otp;
-_currentPhone = phone;
+    _currentOtp = otp;
+    _currentPhone = phone;
 
     final url = Uri.parse(
-      "https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
+      'https://api.msg91.com/api/v5/whatsapp/whatsapp-outbound-message/bulk/',
     );
 
     final body = {
-      "integrated_number": "919096457700", // your MSG91 number
-      "content_type": "template",
-      "payload": {
-        "messaging_product": "whatsapp",
-        "type": "template",
-        "template": {
-          "name": "otp_login",
-          "language": {
-            "code": "en",
-            "policy": "deterministic"
+      'integrated_number': '918793744117',
+      'content_type': 'template',
+      'payload': {
+        'messaging_product': 'whatsapp',
+        'type': 'template',
+        'template': {
+          'name': 'otppp_login',
+          'language': {
+            'code': 'en',
+            'policy': 'deterministic',
           },
-          "namespace": "4ffa31a1_ffeb_487b_9817_7ab865d7addf",
-          "to_and_components": [
+          'namespace': '966353f8_de57_41d3_b22b_286d3ad61238',
+          'to_and_components': [
             {
-              "to": ["91$phone"], // user number
-              "components": {
-  "body_1": {
-    "type": "text",
-    "value": otp
-  },
-  "button_1": {
-    "subtype": "url",
-    "type": "text",
-    "value": otp // 🔥 SAME OTP HERE
-  }
-}
-            }
-          ]
-        }
-      }
+              'to': ['91$phone'],
+              'components': {
+                'body_1': {
+                  'type': 'text',
+                  'value': otp,
+                },
+                'button_1': {
+                  'subtype': 'url',
+                  'type': 'text',
+                  'value': otp,
+                },
+              },
+            },
+          ],
+        },
+      },
     };
 
     final response = await http.post(
       url,
       headers: {
-        "Content-Type": "application/json",
-        "authkey": "499846AoYOdUNzyF69fb27a5P1", // 🔐 replace
+        'Content-Type': 'application/json',
+        'authkey': '499846AoYOdUNzyF69fb27a5P1',
       },
       body: jsonEncode(body),
     );
 
     if (response.statusCode == 200) {
-      print("✅ OTP Sent: $otp"); // debug only
+      // Do not print the OTP or authentication key.
       codeSent();
     } else {
-      print("❌ MSG91 Error: ${response.body}");
-      throw Exception("Failed to send OTP");
+      throw Exception(
+        'Failed to send OTP. HTTP ${response.statusCode}: '
+        '${response.body}',
+      );
     }
   }
 
-  /// 🔍 VERIFY OTP (MANUAL)
-Future<void> verifyOtp(String phone, String otp) async {
+  /// Manually verify the OTP.
+  Future<void> verifyOtp(String phone, String otp) async {
+    final prefs = await SharedPreferences.getInstance();
 
-  final prefs = await SharedPreferences.getInstance();
+    final savedPhone = prefs.getString('otp_phone');
+    final savedOtp = prefs.getString('otp_code');
 
-  final savedPhone = prefs.getString("otp_phone");
-  final savedOtp = prefs.getString("otp_code");
+    if (savedPhone == phone && savedOtp == otp) {
+      await prefs.remove('otp_phone');
+      await prefs.remove('otp_code');
 
-  print("========== VERIFY DEBUG ==========");
-  print("Saved Phone: $savedPhone");
-  print("Entered Phone: $phone");
+      _currentOtp = null;
+      _currentPhone = null;
+      return;
+    }
 
-  print("Saved OTP: $savedOtp");
-  print("Entered OTP: $otp");
-
-  print("Phone Match: ${savedPhone == phone}");
-  print("OTP Match: ${savedOtp == otp}");
-
-  if (savedPhone == phone && savedOtp == otp) {
-
-    await prefs.remove("otp_phone");
-    await prefs.remove("otp_code");
-
-    print("✅ OTP Verified");
-    return;
-
-  } else {
-
-    throw Exception(
-      "Phone Match: ${savedPhone == phone}, "
-      "OTP Match: ${savedOtp == otp}",
-    );
+    throw Exception('Invalid phone number or OTP.');
   }
-}
 }

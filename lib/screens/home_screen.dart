@@ -1,20 +1,38 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:carousel_slider/carousel_controller.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import '../services/tenant_config.dart';
 import 'product_list_screen.dart';
 import 'package:provider/provider.dart';
 import '../wishlist/wishlist_provider.dart';
 import '../providers/home_provider.dart'; // ✅ ADDED
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'wishlist_screen.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../services/user_helper.dart';
+import 'rent_your_dress_screen.dart';
 import 'credit_history_screen.dart';
+class _ImagePlaceholder extends StatelessWidget {
+  const _ImagePlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFF1E9DE),
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.checkroom_outlined,
+        color: Color(0xFFB68A52),
+        size: 30,
+      ),
+    );
+  }
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -22,13 +40,43 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
+  static const Color _canvas = Color(0xFFFAF8F5);
+  static const Color _ink = Color(0xFF29221F);
+  static const Color _muted = Color(0xFF8E857D);
+  static const Color _gold = Color(0xFFB68A52);
+  static const Color _softGold = Color(0xFFF7F0E7);
+  static const Color _line = Color(0xFFECE5DC);
 
   bool loadRest = false;
-List<Map<String, String>> notifications = [];
+  final List<Map<String, String>> notifications = [];
+  StreamSubscription<RemoteMessage>? _messageSubscription;
+  late final AnimationController _entranceController;
+  late final Animation<double> _pageFade;
+  late final Animation<Offset> _pageSlide;
+
   @override
-void initState() {
-  super.initState();
+  void initState() {
+    super.initState();
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    _pageFade = CurvedAnimation(
+      parent: _entranceController,
+      curve: Curves.easeOutCubic,
+    );
+    _pageSlide = Tween<Offset>(
+      begin: const Offset(0, 0.025),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _entranceController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+    _entranceController.forward();
 
   /// Wishlist init
   Future.microtask(() {
@@ -37,7 +85,7 @@ void initState() {
   });
 
   /// 🔔 FOREGROUND NOTIFICATION
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+  _messageSubscription = FirebaseMessaging.onMessage.listen((RemoteMessage message) {
 
   final title =
       message.notification?.title ?? "Notification";
@@ -159,75 +207,154 @@ void initState() {
   });
 }
 
+  @override
+  void dispose() {
+    _messageSubscription?.cancel();
+    _entranceController.dispose();
+    super.dispose();
+  }
+
   int activeIndex = 0;
   final CarouselSliderController carouselController = CarouselSliderController();
 
   @override
   Widget build(BuildContext context) {
-
     final home = Provider.of<HomeProvider>(context);
 
-    /// 🔥 LOADING STATE
     if (home.isLoading) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        backgroundColor: _canvas,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: _gold,
+            strokeWidth: 2.5,
+          ),
+        ),
       );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFCF9F8),
+      backgroundColor: _canvas,
+      body: FadeTransition(
+        opacity: _pageFade,
+        child: SlideTransition(
+          position: _pageSlide,
+          child: _buildHomeContent(),
+        ),
+      ),
+    );
+  }
 
-      body: CustomScrollView(
-        cacheExtent: 2000,
-        physics: const BouncingScrollPhysics(),
+  Widget _buildHomeContent() {
+    return CustomScrollView(
+      cacheExtent: 1600,
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        _topBar(),
+        SliverToBoxAdapter(
+          child: Column(
+            children: [
+              const SizedBox(height: 16),
+              _searchBar(),
+              const SizedBox(height: 20),
+              _editorialIntro(),
+              const SizedBox(height: 18),
+              _heroSlider(),
+              const SizedBox(height: 24),
+              _rentYourDressBanner(),
+            ],
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: loadRest
+              ? Column(
+                  children: [
+                    const SizedBox(height: 30),
+                    _collectionsGrid(),
+                    const SizedBox(height: 36),
+                    _promotionsSlider(),
+                    const SizedBox(height: 30),
+                    _miniTrendSlider(),
+                    const SizedBox(height: 30),
+                    _occasionCarousel(),
+                    const SizedBox(height: 36),
+                    _topStoriesSlider(),
+                    const SizedBox(height: 30),
+                  ],
+                )
+              : const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 36),
+                  child: Center(
+                    child: SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                        color: _gold,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
 
-        slivers: [
-
-          _topBar(),
-
-          /// 🔥 TOP SECTION
-          SliverToBoxAdapter(
+  Widget _editorialIntro() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 22),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
             child: Column(
-              children:  [
-                SizedBox(height: 20),
-                 _searchBar(),
-
-  const SizedBox(height:20),
-
-  _heroSlider(),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'THE DOR EDIT',
+                  style: TextStyle(
+                    color: _gold,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2.2,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                const Text(
+                  'Make every moment\\nlook unforgettable.',
+                  style: TextStyle(
+                    color: _ink,
+                    fontSize: 25,
+                    height: 1.12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.8,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                const Text(
+                  'Discover your next occasion look.',
+                  style: TextStyle(
+                    color: _muted,
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
+                ),
               ],
             ),
           ),
-
-          /// 🔥 REST
-          SliverToBoxAdapter(
-            child: loadRest
-                ? Column(
-                    children:  [
-                      SizedBox(height: 30),
-                      _collectionsGrid(),
-
-        const SizedBox(height:40),
-
-        _promotionsSlider(),
-
-        const SizedBox(height:30),
-
-        _miniTrendSlider(),
-
-        const SizedBox(height:30),
-
-        _occasionCarousel(),
-
-        const SizedBox(height:40),
-
-        _topStoriesSlider(),
-
-
-                      SizedBox(height: 30),
-                    ],
-                  ) 
-                : const SizedBox(),
+          Container(
+            width: 43,
+            height: 43,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: _line),
+            ),
+            child: const Icon(
+              Icons.auto_awesome_rounded,
+              color: _gold,
+              size: 21,
+            ),
           ),
         ],
       ),
@@ -239,20 +366,61 @@ void initState() {
   return SliverAppBar(
     floating: true,
     elevation: 0,
-    backgroundColor: Colors.white,
-    toolbarHeight: 70,
+    scrolledUnderElevation: 0,
+    surfaceTintColor: Colors.transparent,
+    backgroundColor: _canvas,
+    toolbarHeight: 72,
+    automaticallyImplyLeading: false,
 
     title: Row(
       children: [
 
         /// 🏷 APP NAME
-        Text(
-          TenantConfig.appName,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-            letterSpacing: 1.5,
-            color: Colors.black,
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF30251F), Color(0xFF76583E)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: const Icon(
+            Icons.diamond_rounded,
+            color: Color(0xFFE5C995),
+            size: 21,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                TenantConfig.appName.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                  letterSpacing: 1.4,
+                  color: _ink,
+                ),
+              ),
+              const SizedBox(height: 2),
+              const Text(
+                'RENT • REPEAT • REJOICE',
+                style: TextStyle(
+                  fontSize: 8,
+                  letterSpacing: 1.1,
+                  color: _muted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
 
@@ -264,15 +432,23 @@ void initState() {
     showNotificationsSheet();
   },
 
-  child: Stack(
-    clipBehavior: Clip.none,
-
-    children: [
-
-      const Icon(
-        Icons.notifications_none,
-        size: 26,
-      ),
+  child: Container(
+    width: 40,
+    height: 40,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: _line),
+    ),
+    alignment: Alignment.center,
+    child: Stack(
+      clipBehavior: Clip.none,
+      children: [
+        const Icon(
+          Icons.notifications_none_rounded,
+          size: 22,
+          color: _ink,
+        ),
 
       /// 🔥 BADGE
       if (notifications.isNotEmpty)
@@ -311,11 +487,12 @@ void initState() {
             ),
           ),
         ),
-    ],
+      ],
+    ),
   ),
 ),
 
-        const SizedBox(width: 12),
+        const SizedBox(width: 9),
 
         /// 💰 WALLET (LIVE FROM FIRESTORE)
         GestureDetector(
@@ -340,9 +517,9 @@ void initState() {
             padding: const EdgeInsets.symmetric(
                 horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F7),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.black12),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _line),
             ),
             child: Row(
               children: [
@@ -410,7 +587,10 @@ void initState() {
           snapshot.data!.docs.first.data()
               as Map<String, dynamic>;
 
-      wallet = data["Balance"] ?? 0;
+      final rawBalance = data["Balance"];
+      wallet = rawBalance is num
+          ? rawBalance.toInt()
+          : int.tryParse(rawBalance?.toString() ?? '') ?? 0;
     }
 
     return Text(
@@ -433,7 +613,7 @@ void initState() {
           ),
         ),
 
-        const SizedBox(width: 12),
+        const SizedBox(width: 9),
 
         /// ❤️ WISHLIST
         GestureDetector(
@@ -498,56 +678,61 @@ void initState() {
     ),
   );
 }
-  Widget _searchBar(){
-
-return Padding(
-  padding: const EdgeInsets.symmetric(horizontal:20),
-
-  child: Container(
-
-    height:50,
-
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(30),
-      boxShadow: [
-        BoxShadow(
-          blurRadius: 20,
-          color: Colors.black.withOpacity(.05)
-        )
-      ],
-    ),
-
-    child: Row(
-      children: const [
-
-        SizedBox(width:15),
-
-        Icon(Icons.search,color:Colors.grey),
-
-        SizedBox(width:10),
-
-        Expanded(
-          child: Text(
-            "Find your perfect look...",
-            style: TextStyle(color:Colors.grey),
+  Widget _searchBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          height: 54,
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: _line),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF33251D).withOpacity(0.035),
+                blurRadius: 18,
+                offset: const Offset(0, 7),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.search_rounded, color: _gold, size: 22),
+              const SizedBox(width: 11),
+              const Expanded(
+                child: Text(
+                  'Find your perfect look...',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: _muted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: _softGold,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.tune_rounded,
+                  color: _gold,
+                  size: 18,
+                ),
+              ),
+            ],
           ),
         ),
-
-        CircleAvatar(
-          radius:18,
-          backgroundColor:Colors.deepPurple,
-          child: Icon(Icons.tune,color:Colors.white,size:18),
-        ),
-
-        SizedBox(width:10)
-
-      ],
-    ),
-  ),
-);
-
-}
+      ),
+    );
+  }
 
 Widget _topStoriesSlider() {
 
@@ -574,7 +759,7 @@ Widget _topStoriesSlider() {
           children: [
 
             Text(
-              "Top Stories Of The Week",
+              "Stories worth a look",
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -584,7 +769,7 @@ Widget _topStoriesSlider() {
             SizedBox(height: 4),
 
             Text(
-              "In the spotlight",
+              "Style inspiration, curated for you",
               style: TextStyle(color: Colors.grey),
             ),
           ],
@@ -614,6 +799,8 @@ Widget _topStoriesSlider() {
 
             child: CachedNetworkImage(
               imageUrl: stories[index] + "&w=400",
+              placeholder: (_, __) => const _ImagePlaceholder(),
+              errorWidget: (_, __, ___) => const _ImagePlaceholder(),
               fit: BoxFit.cover,
               width: double.infinity,
             ),
@@ -668,7 +855,8 @@ Widget _heroSlider() {
                   Positioned.fill(
                     child: CachedNetworkImage(
                       imageUrl: image,
-                      
+                      placeholder: (_, __) => const _ImagePlaceholder(),
+                      errorWidget: (_, __, ___) => const _ImagePlaceholder(),
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -707,7 +895,7 @@ Widget _heroSlider() {
             width: isActive ? 14 : 5,
             decoration: BoxDecoration(
               color: isActive
-                  ? Colors.deepPurple
+                  ? _gold
                   : Colors.grey.shade400,
               borderRadius: BorderRadius.circular(20),
             ),
@@ -717,7 +905,85 @@ Widget _heroSlider() {
     ],
   );
 }
-
+Widget _rentYourDressBanner() {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(24),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const RentYourDressScreen(),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFF30251F),
+              Color(0xFF76583E),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: const Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'RENT YOUR DRESS WITH DOR',
+                    style: TextStyle(
+                      color: Color(0xFFE5C995),
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'Your wardrobe can earn.',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 21,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Share your outfits. Earn or get Dor credits.',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                    ),
+                  ),
+                  SizedBox(height: 14),
+                  Text(
+                    'EXPLORE THE PROGRAM  →',
+                    style: TextStyle(
+                      color: Color(0xFFE5C995),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 12),
+            Icon(
+              Icons.checkroom_outlined,
+              color: Color(0xFFE5C995),
+              size: 48,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
 
 Widget _miniTrendSlider() {
 
@@ -820,8 +1086,9 @@ Widget _genderSlider(List<Map<String, dynamic>> items) {
                 children: [
 
                   CachedNetworkImage(
-                    imageUrl: item["image"],
-                    
+                    imageUrl: item["image"] ?? "",
+                    placeholder: (_, __) => const _ImagePlaceholder(),
+                    errorWidget: (_, __, ___) => const _ImagePlaceholder(),
                     fit: BoxFit.cover,
                     width: double.infinity,
                     height: double.infinity,
@@ -880,7 +1147,7 @@ Widget _occasionCarousel() {
           children: [
 
             const Text(
-              "Select By Occasion",
+              "Dress for the moment",
               style: TextStyle(
                 fontSize: 26,
                 fontWeight: FontWeight.bold,
@@ -890,7 +1157,7 @@ Widget _occasionCarousel() {
             const SizedBox(height: 4),
 
             Text(
-              "Find outfits for every celebration",
+              "Looks for every celebration and every memory",
               style: TextStyle(
                 color: Colors.grey.shade600,
                 fontSize: 14,
@@ -903,7 +1170,7 @@ Widget _occasionCarousel() {
               height: 4,
               width: 50,
               decoration: BoxDecoration(
-                color: Colors.deepPurple,
+                color: _gold,
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
@@ -975,7 +1242,8 @@ Widget _occasionCard(String title, String subtitle, String image) {
           /// 🔥 OPTIMIZED IMAGE
           CachedNetworkImage(
             imageUrl: image,
-           
+            placeholder: (_, __) => const _ImagePlaceholder(),
+            errorWidget: (_, __, ___) => const _ImagePlaceholder(),
             width: double.infinity,
             height: double.infinity,
             fit: BoxFit.cover,
@@ -1042,7 +1310,7 @@ Widget _promotionsSlider() {
       const Padding(
         padding: EdgeInsets.symmetric(horizontal: 20),
         child: Text(
-          "Offers & Promotions",
+          "Offers picked for you",
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
@@ -1108,7 +1376,8 @@ Widget _promotionCard(
           /// 🔥 optimized image
           CachedNetworkImage(
             imageUrl: image,
-            
+            placeholder: (_, __) => const _ImagePlaceholder(),
+            errorWidget: (_, __, ___) => const _ImagePlaceholder(),
             fit: BoxFit.cover,
             width: double.infinity,
             height: double.infinity,
@@ -1201,7 +1470,7 @@ Widget _promotionCard(
       children: [
 
         const Text(
-          "Collections",
+          "Explore collections",
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -1222,7 +1491,7 @@ Widget _promotionCard(
             mainAxisSpacing: 14,
 
             /// 🔥 better sizing
-            childAspectRatio: collections.length <= 2 ? 1.6 : 0.9,
+            childAspectRatio: collections.length <= 2 ? 1.65 : 0.82,
           ),
 
           itemBuilder: (context, index) {
@@ -1260,6 +1529,8 @@ Widget _collectionCard(String title, String image, String collectionId) {
         children: [
           CachedNetworkImage(
             imageUrl: image,
+            placeholder: (_, __) => const _ImagePlaceholder(),
+            errorWidget: (_, __, ___) => const _ImagePlaceholder(),
             width: double.infinity,
             height: double.infinity,
             fit: BoxFit.cover,
@@ -1314,7 +1585,7 @@ void showNotificationsSheet() {
     builder: (_) {
 
       return Container(
-        height: MediaQuery.of(context).size.height * .75,
+        height: MediaQuery.of(context).size.height * .78,
 
         padding: const EdgeInsets.all(24),
 
@@ -1428,7 +1699,7 @@ Widget notificationTile(
     padding: const EdgeInsets.all(16),
 
     decoration: BoxDecoration(
-      color: const Color(0xFFF8F3EA),
+      color: _softGold,
       borderRadius: BorderRadius.circular(20),
     ),
 
@@ -1445,7 +1716,7 @@ Widget notificationTile(
 
           child: Icon(
             icon,
-            color: const Color(0xFFC8A96B),
+            color: _gold,
           ),
         ),
 
