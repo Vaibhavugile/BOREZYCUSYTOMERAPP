@@ -157,179 +157,249 @@ class _OtpScreenState extends State<OtpScreen>
     return cleaned;
   }
 
-  Future<void> _verifyOtp() async {
-    FocusScope.of(context).unfocus();
+ 
+Future<void> _verifyOtp() async {
+  FocusScope.of(context).unfocus();
 
-    if (otpCode.length != 6) {
-      _shakeController.forward(from: 0);
-      _showMessage('Enter the complete 6-digit OTP.');
+  if (otpCode.length != 6) {
+    _shakeController.forward(from: 0);
+    _showMessage('Enter the complete 6-digit OTP.');
+    return;
+  }
+
+  if (loading || resendLoading) return;
+
+  setState(() => loading = true);
+
+  var showRewardPopup = false;
+  var rewardAmount = 0;
+  var currentStep = 'Starting login';
+
+  try {
+    // Apple review test account.
+    if (widget.phone == '9999999999' && otpCode == '123456') {
+      currentStep = 'Signing in to Firebase (review account)';
+
+      await FirebaseAuth.instance.signInAnonymously();
+
+      const reviewPhone = '9999999999';
+      await UserHelper.setPhone(reviewPhone);
+
+      if (!mounted) return;
+
+      currentStep = 'Loading home screen';
+      await _loadHomeAndNavigate();
       return;
     }
 
-    if (loading || resendLoading) return;
+    // Step 1: Verify the MSG91 OTP using the existing AuthService.
+    currentStep = 'Verifying OTP';
 
-    setState(() => loading = true);
+    await widget.authService.verifyOtp(widget.phone, otpCode);
 
-    var showRewardPopup = false;
-    var rewardAmount = 0;
+    // Step 2: Normalize and persist the phone number.
+    currentStep = 'Saving customer phone';
 
-    try {
-      // Apple review test flow. Keep the configured review OTP behavior.
-      if (widget.phone == '9999999999' && otpCode == '123456') {
-        await FirebaseAuth.instance.signInAnonymously();
+    final phone = _normalizePhone(widget.phone);
 
-        const reviewPhone = '9999999999';
-        await UserHelper.setPhone(reviewPhone);
+    // Step 3: Preserve existing anonymous Firebase authentication.
+    currentStep = 'Signing in to Firebase';
 
-        if (!mounted) return;
+    await FirebaseAuth.instance.signInAnonymously();
+    await UserHelper.setPhone(phone);
 
-        await _loadHomeAndNavigate();
-        return;
-      }
+    final branch = TenantConfig.branchCode;
+    const welcomeReward = 100;
 
-      // Step 1: Verify the SMS code through the existing AuthService.
-      await widget.authService.verifyOtp(widget.phone, otpCode);
+    final userRef = FirebaseFirestore.instance
+        .collection('customers')
+        .doc(branch)
+        .collection('users')
+        .doc(phone);
 
-      // Step 2: Normalize and persist the phone identity used by this app.
-      final phone = _normalizePhone(widget.phone);
+    // Step 4: Load or create the customer profile.
+    currentStep = 'Loading customer profile';
 
-      // Step 3: Preserve the app's current Firebase-auth behavior for Firestore rules.
-      await FirebaseAuth.instance.signInAnonymously();
-      await UserHelper.setPhone(phone);
+    final userSnap = await userRef.get();
 
-      final branch = TenantConfig.branchCode;
-      const welcomeReward = 100;
+    if (!userSnap.exists) {
+      currentStep = 'Creating customer profile';
 
-      final userRef = FirebaseFirestore.instance
-          .collection('customers')
+      await userRef.set({
+        'phone': phone,
+        'name': '',
+        'branch': branch,
+        'createdAt': FieldValue.serverTimestamp(),
+        'firstLogin': FieldValue.serverTimestamp(),
+        'creditBalance': welcomeReward,
+        'rewardGiven': true,
+      });
+
+      showRewardPopup = true;
+      rewardAmount = welcomeReward;
+
+      currentStep = 'Creating welcome reward';
+
+      await FirebaseFirestore.instance
+          .collection('products')
           .doc(branch)
-          .collection('users')
-          .doc(phone);
+          .collection('creditNotes')
+          .add({
+        'Name': 'Customer',
+        'mobileNumber': phone,
+        'amount': welcomeReward,
+        'CreditUsed': 0,
+        'Balance': welcomeReward,
+        'Comment': 'App Signup Reward 🎉',
+        'status': 'active',
+        'source': 'app_signup',
+        'createdAt': FieldValue.serverTimestamp(),
+        'createdBy': 'app',
+      });
+    } else {
+      final data = userSnap.data();
+      final rewardGiven = data?['rewardGiven'] == true;
 
-      final userSnap = await userRef.get();
+      if (!rewardGiven) {
+        currentStep = 'Updating welcome reward';
 
-      if (!userSnap.exists) {
-        // New customer: create profile and welcome reward.
         await userRef.set({
-          'phone': phone,
-          'name': '',
-          'branch': branch,
-          'createdAt': FieldValue.serverTimestamp(),
           'firstLogin': FieldValue.serverTimestamp(),
-          'creditBalance': welcomeReward,
+          'creditBalance': FieldValue.increment(welcomeReward),
           'rewardGiven': true,
-        });
+        }, SetOptions(merge: true));
 
         showRewardPopup = true;
         rewardAmount = welcomeReward;
 
-        await FirebaseFirestore.instance
+        currentStep = 'Checking reward history';
+
+        final creditQuery = await FirebaseFirestore.instance
             .collection('products')
             .doc(branch)
             .collection('creditNotes')
-            .add({
-          'Name': 'Customer',
-          'mobileNumber': phone,
-          'amount': welcomeReward,
-          'CreditUsed': 0,
-          'Balance': welcomeReward,
-          'Comment': 'App Signup Reward 🎉',
-          'status': 'active',
-          'source': 'app_signup',
-          'createdAt': FieldValue.serverTimestamp(),
-          'createdBy': 'app',
-        });
-      } else {
-        final data = userSnap.data();
-        final rewardGiven = data?['rewardGiven'] == true;
+            .where('mobileNumber', isEqualTo: phone)
+            .limit(1)
+            .get();
 
-        if (!rewardGiven) {
-          await userRef.set({
-            'firstLogin': FieldValue.serverTimestamp(),
-            'creditBalance': FieldValue.increment(welcomeReward),
-            'rewardGiven': true,
-          }, SetOptions(merge: true));
+        if (creditQuery.docs.isNotEmpty) {
+          final creditDoc = creditQuery.docs.first;
+          final existing = creditDoc.data();
 
-          showRewardPopup = true;
-          rewardAmount = welcomeReward;
+          final oldAmount = _asNumber(existing['amount']);
+          final oldBalance = _asNumber(existing['Balance']);
 
-          final creditQuery = await FirebaseFirestore.instance
+          currentStep = 'Updating reward history';
+
+          await creditDoc.reference.update({
+            'amount': oldAmount + welcomeReward,
+            'Balance': oldBalance + welcomeReward,
+            'Comment': 'Updated: App Signup Reward 🎉',
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        } else {
+          currentStep = 'Creating reward history';
+
+          await FirebaseFirestore.instance
               .collection('products')
               .doc(branch)
               .collection('creditNotes')
-              .where('mobileNumber', isEqualTo: phone)
-              .limit(1)
-              .get();
-
-          if (creditQuery.docs.isNotEmpty) {
-            final creditDoc = creditQuery.docs.first;
-            final existing = creditDoc.data();
-            final oldAmount = _asNumber(existing['amount']);
-            final oldBalance = _asNumber(existing['Balance']);
-
-            await creditDoc.reference.update({
-              'amount': oldAmount + welcomeReward,
-              'Balance': oldBalance + welcomeReward,
-              'Comment': 'Updated: App Signup Reward 🎉',
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-          } else {
-            await FirebaseFirestore.instance
-                .collection('products')
-                .doc(branch)
-                .collection('creditNotes')
-                .add({
-              'Name': data?['name'] ?? 'Customer',
-              'mobileNumber': phone,
-              'amount': welcomeReward,
-              'CreditUsed': 0,
-              'Balance': welcomeReward,
-              'Comment': 'App Signup Reward 🎉',
-              'status': 'active',
-              'source': 'app_signup',
-              'createdAt': FieldValue.serverTimestamp(),
-              'createdBy': 'app',
-            });
-          }
-        } else {
-          await userRef.set({
-            'lastLogin': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+              .add({
+            'Name': data?['name'] ?? 'Customer',
+            'mobileNumber': phone,
+            'amount': welcomeReward,
+            'CreditUsed': 0,
+            'Balance': welcomeReward,
+            'Comment': 'App Signup Reward 🎉',
+            'status': 'active',
+            'source': 'app_signup',
+            'createdAt': FieldValue.serverTimestamp(),
+            'createdBy': 'app',
+          });
         }
-      }
+      } else {
+        currentStep = 'Updating last login';
 
-      if (!mounted) return;
-
-      await FCMService.setupFCM();
-      if (!mounted) return;
-
-      await _loadHomeAndNavigate();
-
-      if (showRewardPopup && mounted) {
-        Future.delayed(const Duration(milliseconds: 450), () {
-          if (!mounted) return;
-
-          showDialog<void>(
-            context: context,
-            barrierDismissible: false,
-            builder: (_) => RewardPopup(amount: rewardAmount),
-          );
-        });
-      }
-    } catch (error, stackTrace) {
-      debugPrint('OTP verification failed: $error');
-      debugPrintStack(stackTrace: stackTrace);
-
-      if (!mounted) return;
-
-      _shakeController.forward(from: 0);
-      _showMessage(_friendlyError(error));
-    } finally {
-      if (mounted) {
-        setState(() => loading = false);
+        await userRef.set({
+          'lastLogin': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
       }
     }
+
+    if (!mounted) return;
+
+    // Step 5: Register this device for push notifications.
+    currentStep = 'Registering push notifications';
+
+    await FCMService.setupFCM();
+
+    if (!mounted) return;
+
+    // Step 6: Navigate to the main screen.
+    currentStep = 'Loading home screen';
+
+    await _loadHomeAndNavigate();
+
+    if (showRewardPopup && mounted) {
+      Future.delayed(const Duration(milliseconds: 450), () {
+        if (!mounted) return;
+
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => RewardPopup(amount: rewardAmount),
+        );
+      });
+    }
+  } catch (error, stackTrace) {
+    debugPrint('LOGIN FAILED AT: $currentStep');
+    debugPrint('LOGIN ERROR: $error');
+    debugPrintStack(stackTrace: stackTrace);
+
+    if (!mounted) return;
+
+    _shakeController.forward(from: 0);
+
+    // Display the failing step and error on the TestFlight device.
+    final details = error.toString();
+    final errorCode = error is FirebaseException
+        ? '\nFirebase error code: ${error.code}'
+        : '';
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Login diagnostic'),
+        content: SingleChildScrollView(
+          child: SelectableText(
+            'Failed step:\n$currentStep\n\n'
+            'Error:\n$details$errorCode',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+            },
+            child: const Text('Close'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              _showMessage('Please retry the login.');
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() => loading = false);
+    }
   }
+}
+
 
   num _asNumber(dynamic value) {
     if (value is num) return value;
