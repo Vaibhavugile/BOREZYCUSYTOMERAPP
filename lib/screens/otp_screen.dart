@@ -331,7 +331,14 @@ Future<void> _verifyOtp() async {
     // Step 5: Register this device for push notifications.
     currentStep = 'Registering push notifications';
 
-    await FCMService.setupFCM();
+    try {
+      await FCMService.setupFCM().timeout(
+        const Duration(seconds: 35),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('FCM setup failed; continuing login: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
 
     if (!mounted) return;
 
@@ -544,6 +551,8 @@ Future<void> _verifyOtp() async {
                             _buildHeading(),
                             const SizedBox(height: 26),
                             _buildOtpCard(context),
+                            const SizedBox(height: 14),
+                            _buildFcmDiagnosticPanel(),
                             const SizedBox(height: 22),
                             _buildFooter(),
                           ],
@@ -557,6 +566,80 @@ Future<void> _verifyOtp() async {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildFcmDiagnosticPanel() {
+    return ValueListenableBuilder<List<String>>(
+      valueListenable: FCMService.diagnosticLogs,
+      builder: (context, logs, _) {
+        if (logs.isEmpty) return const SizedBox.shrink();
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF211F1D),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _gold.withOpacity(0.5)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.bug_report_outlined,
+                    color: Color(0xFFE6C28B),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'FCM / APNs Diagnostics',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: FCMService.clearDiagnosticLogs,
+                    child: const Text(
+                      'Clear',
+                      style: TextStyle(color: Color(0xFFE6C28B)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 220),
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    logs.join('\n'),
+                    style: const TextStyle(
+                      color: Color(0xFFEAE5DF),
+                      fontSize: 10,
+                      height: 1.4,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 5),
+              const Text(
+                'Temporary diagnostic information. Device tokens are hidden.',
+                style: TextStyle(
+                  color: Color(0xFFB8ADA2),
+                  fontSize: 9,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
