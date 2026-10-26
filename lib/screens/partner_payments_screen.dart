@@ -986,23 +986,15 @@ class _PartnerBooking {
       data['discountOnRent'] ?? data['discountonrent'] ??
       userDetails['discountOnRent'] ?? userDetails['discountonrent'] ?? 0,
     );
-    // Allocate a bill-level discount by each line's share of gross rent,
-    // never equally by product count. Explicit line discounts take precedence.
-    final explicitDiscountKeys = ['discountOnRent', 'rentDiscount', 'discountAmount', 'discount'];
-    final hasExplicitLineDiscounts = allSummary.any(
-      (line) => explicitDiscountKeys.any((key) => line[key] != null),
-    );
-    double allGrossRent = 0;
-    for (final line in allSummary) {
-      final lineRent = number(line['totalRent'] ?? line['grossRent']) > 0
-          ? number(line['totalRent'] ?? line['grossRent'])
-          : number(line['rent'] ?? line['price'] ?? line['finalRent'] ?? line['finalrent']) *
-              (number(line['quantity'] ?? 1) > 0 ? number(line['quantity'] ?? 1) : 1);
-      allGrossRent += lineRent;
-    }
+
+    // Match PartnerBookingsScreen: divide the bill-level rental discount
+    // equally across all product lines, then allocate the matched partner
+    // products' equal shares to this partner.
+    final totalProductLines = allSummary.isNotEmpty ? allSummary.length : products.length;
+    final discountPerProduct =
+        totalProductLines > 0 ? totalDiscount / totalProductLines : 0.0;
 
     double matchedGrossRent = 0;
-    double matchedExplicitDiscount = 0;
     var matchedSummaryCount = 0;
     for (final partnerProduct in products) {
       final partnerId = (partnerProduct['productId'] ?? partnerProduct['id'] ?? '').toString().trim();
@@ -1022,13 +1014,7 @@ class _PartnerBooking {
         final rent = number(summary['rent'] ?? summary['price'] ?? summary['finalRent'] ?? summary['finalrent']);
         final quantity = number(summary['quantity'] ?? 1);
         // Legacy productsSummary stores per-unit rent and quantity.
-        final lineGross = rent * (quantity > 0 ? quantity : 1);
-        matchedGrossRent += lineGross;
-        if (hasExplicitLineDiscounts) {
-          final rawDiscount = summary['discountOnRent'] ?? summary['rentDiscount'] ??
-              summary['discountAmount'] ?? summary['discount'];
-          matchedExplicitDiscount += number(rawDiscount);
-        }
+        matchedGrossRent += rent * (quantity > 0 ? quantity : 1);
         matchedSummaryCount++;
       } else {
         final rent = number(partnerProduct['rent'] ?? partnerProduct['price'] ?? partnerProduct['finalRent'] ?? partnerProduct['finalrent']);
@@ -1037,19 +1023,12 @@ class _PartnerBooking {
       }
     }
 
-    // When line-level discounts exist, use only the explicit discounts on
-    // matched partner lines. Otherwise allocate the receipt discount in
-    // proportion to matched gross rent / total bill gross rent.
-    final fallbackBillGross = number(
-      data['grandTotalRent'] ?? data['grandtotalrent'] ?? data['finalRent'] ??
-      data['finalrent'] ?? userDetails['grandTotalRent'] ?? userDetails['grandtotalrent'],
-    );
-    final discountDenominator = allGrossRent > 0 ? allGrossRent : fallbackBillGross;
-    final allocatedDiscount = hasExplicitLineDiscounts
-        ? matchedExplicitDiscount
-        : (discountDenominator > 0
-            ? totalDiscount * (matchedGrossRent / discountDenominator).clamp(0.0, 1.0)
-            : (allSummary.isEmpty && products.length == 1 ? totalDiscount : 0.0));
+    // If the receipt has product lines, allocate one equal discount share for
+    // every matched line. If no bill summary exists, use the matched products
+    // as the fallback line count, matching PartnerBookingsScreen behavior.
+    final allocatedDiscount = (allSummary.isNotEmpty && matchedSummaryCount > 0)
+        ? discountPerProduct * matchedSummaryCount
+        : (allSummary.isEmpty ? discountPerProduct * products.length : 0.0);
     final netMatchedRent = (matchedGrossRent - allocatedDiscount).clamp(0.0, double.infinity).toDouble();
     // Current partnership split: product owner/partner receives 30%; DOR keeps 70%.
     final partnerRevenue = netMatchedRent * 0.30;

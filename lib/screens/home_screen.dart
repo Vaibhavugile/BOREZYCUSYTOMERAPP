@@ -363,7 +363,7 @@ class _HomeScreenState extends State<HomeScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'DOR • THE RENTAL EDIT',
+                  'DOR • Dress On Rent',
                   style: TextStyle(
                     color: _gold,
                     fontSize: 10,
@@ -373,7 +373,7 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 const SizedBox(height: 7),
                 const Text(
-                  'Luxury looks.\\nLighter living.',
+                  'Luxury looks. Lighter living.',
                   style: TextStyle(
                     color: _ink,
                     fontSize: 24,
@@ -464,7 +464,7 @@ class _HomeScreenState extends State<HomeScreen>
               ),
               const SizedBox(height: 2),
               const Text(
-                'RENT • REPEAT • REJOICE',
+                'Dress On Rent',
                 style: TextStyle(
                   fontSize: 8,
                   letterSpacing: 1.1,

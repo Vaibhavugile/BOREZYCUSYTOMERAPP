@@ -319,7 +319,7 @@ class _LoginScreenState extends State<LoginScreen>
               ),
               const SizedBox(height: 3),
               const Text(
-                'THE RENTAL EDIT',
+                'Dress On Rent',
                 style: TextStyle(
                   color: _muted,
                   fontSize: 9,

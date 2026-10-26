@@ -1,4 +1,4 @@
-import 'dart:io';
+=import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -429,9 +429,12 @@ class _SubmitDressScreenState extends State<SubmitDressScreen>
           ),
         ),
       ),
-      body: Form(
-        key: _formKey,
-        child: FadeTransition(
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: Form(
+          key: _formKey,
+          child: FadeTransition(
           opacity: _fadeAnimation,
           child: SlideTransition(
             position: _slideAnimation,
@@ -572,7 +575,7 @@ class _SubmitDressScreenState extends State<SubmitDressScreen>
                 _partnershipOption(
                   value: 'credit_note',
                   icon: Icons.card_giftcard_rounded,
-                  title: 'Dor credit note',
+                  title: 'Dor credit ',
                   subtitle: 'Receive eligible shopping credit',
                   description:
                       'Dor will review your dress and confirm any '
@@ -586,6 +589,7 @@ class _SubmitDressScreenState extends State<SubmitDressScreen>
             ),
           ),
         ),
+      ),
       ),
     );
   }

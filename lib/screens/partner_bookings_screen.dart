@@ -441,7 +441,7 @@ class _PartnerBookingsScreenState extends State<PartnerBookingsScreen> {
                             )),
                       const SizedBox(height: 8),
                       Text(
-                        'Revenue is calculated only for active revenue-share dresses: 30% owner share and 70% DOR share after allocated rental discount. Credit-note partnerships are excluded.',
+                        'Your revenue is calculated at 30% of the matched rental amount after the equally allocated rental discount. Only active revenue-share dresses are included.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: _muted.withOpacity(.9), fontSize: 10, height: 1.5),
                       ),
@@ -476,7 +476,7 @@ class _PartnerBookingsScreenState extends State<PartnerBookingsScreen> {
     final upcoming = _bookings.where((b) => _matchesByTab(b, 'Upcoming')).length;
     final current = _bookings.where((b) => _matchesByTab(b, 'Current')).length;
     final past = _bookings.where((b) => _matchesByTab(b, 'Past')).length;
-    final dorRevenue = _bookings.fold<double>(0, (sum, booking) => sum + booking.dorRevenue);
+    final yourRevenue = _bookings.fold<double>(0, (sum, booking) => sum + booking.partnerRevenue);
     return Column(children: [
       Row(children: [
         Expanded(child: _miniMetric('Upcoming', '$upcoming', Icons.event_available_outlined, const Color(0xFF926A2F), const Color(0xFFFAF0DB))),
@@ -486,7 +486,7 @@ class _PartnerBookingsScreenState extends State<PartnerBookingsScreen> {
         Expanded(child: _miniMetric('Past', '$past', Icons.history_rounded, const Color(0xFF35704B), const Color(0xFFE8F3EA))),
       ]),
       const SizedBox(height: 10),
-      _miniMetric('DOR revenue · 70% share', _money(dorRevenue), Icons.account_balance_wallet_outlined, const Color(0xFF7555A3), const Color(0xFFF0EAF8), fullWidth: true),
+      _miniMetric('Your revenue · 30% share', _money(yourRevenue), Icons.account_balance_wallet_outlined, const Color(0xFF35704B), const Color(0xFFE8F3EA), fullWidth: true),
     ]);
   }
 
@@ -583,7 +583,7 @@ class _PartnerBookingsScreenState extends State<PartnerBookingsScreen> {
             const Divider(height: 1, color: _line),
             const SizedBox(height: 11),
             Row(children: [const Icon(Icons.calendar_today_outlined, color: _muted, size: 14), const SizedBox(width: 6), Expanded(child: Text('${_shortDate(booking.pickup)}  →  ${_shortDate(booking.returnDate)}', style: const TextStyle(color: _muted, fontSize: 10, fontWeight: FontWeight.w600))), Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                const Text('OWNER · 30%', style: TextStyle(color: _muted, fontSize: 8, fontWeight: FontWeight.w800, letterSpacing: .4)),
+                const Text('YOUR REVENUE · 30%', style: TextStyle(color: _muted, fontSize: 8, fontWeight: FontWeight.w800, letterSpacing: .4)),
                 const SizedBox(height: 3),
                 Text(_money(booking.partnerRevenue), style: const TextStyle(color: _ink, fontSize: 14, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 7),

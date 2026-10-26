@@ -609,7 +609,7 @@ Future<void> _verifyOtp() async {
               ),
               const SizedBox(height: 3),
               const Text(
-                'SECURE ACCESS',
+                'Dress On Rent',
                 style: TextStyle(
                   color: _muted,
                   fontSize: 9,

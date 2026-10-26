@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../wishlist/wishlist_provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/product_card.dart';
@@ -28,10 +31,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     with TickerProviderStateMixin {
   final PageController _pageController = PageController();
   int currentPage = 0;
-  int selectedSize = 1;
-  final List<String> sizes = const ['S', 'M', 'L', 'XL'];
   bool _imagesPrecached = false;
-  bool _isFavorite = false;
   late final AnimationController _entranceController;
   late final AnimationController _favoriteController;
 
@@ -101,11 +101,65 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
   }
 
   void _toggleFavorite() {
-    setState(() => _isFavorite = !_isFavorite);
-    if (_isFavorite) {
+    final wishlist = Provider.of<WishlistProvider>(
+      context,
+      listen: false,
+    );
+
+    wishlist.toggleById(widget.productId, widget.product);
+
+    if (wishlist.isWishlisted(widget.productId)) {
       _favoriteController.forward(from: 0).then((_) {
         if (mounted) _favoriteController.reverse();
       });
+    }
+  }
+
+  Future<void> _openWhatsApp() async {
+    final product = widget.product;
+    final name = (product['productName'] ?? 'Product').toString();
+    final brand = (product['brandName'] ?? '').toString();
+    final rawPrice = product['price'];
+    final price = rawPrice == null
+        ? 'Price on request'
+        : '₹${rawPrice.toString()}';
+    final code = (product['productCode'] ?? '').toString();
+
+    final message = [
+      'Hi, I am interested in this product.',
+      'Product: $name',
+      if (brand.isNotEmpty) 'Brand: $brand',
+      'Price: $price',
+      if (code.isNotEmpty) 'Product code: $code',
+      'Please share more details.',
+    ].join('\n');
+
+    final uri = Uri.https(
+      'wa.me',
+      '/918698797007',
+      {'text': message},
+    );
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open WhatsApp. Please try again.'),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open WhatsApp. Please try again.'),
+          ),
+        );
+      }
     }
   }
 
@@ -118,6 +172,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     final rawPrice = product['price'];
     final price = rawPrice == null ? 0 : int.tryParse(rawPrice.toString()) ?? 0;
     final images = _images;
+    final isFavorite = context.watch<WishlistProvider>().isWishlisted(widget.productId);
 
     return Scaffold(
       backgroundColor: _cream,
@@ -158,8 +213,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                         const SizedBox(height: 14),
                         _buildRentalInfo(),
                         const SizedBox(height: 14),
-                        _buildSizeSelector(),
-                        const SizedBox(height: 22),
                         _buildDetailsNote(),
                       ],
                     ),
@@ -190,10 +243,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                     Row(
                       children: [
                         _GlassIconButton(
-                          icon: _isFavorite
+                          icon: isFavorite
                               ? Icons.favorite_rounded
                               : Icons.favorite_border_rounded,
-                          iconColor: _isFavorite ? const Color(0xFFB94D50) : _ink,
+                          iconColor: isFavorite ? const Color(0xFFB94D50) : _ink,
                           onTap: _toggleFavorite,
                           child: ScaleTransition(
                             scale: Tween<double>(begin: 1, end: 1.18).animate(
@@ -203,10 +256,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                               ),
                             ),
                             child: Icon(
-                              _isFavorite
+                              isFavorite
                                   ? Icons.favorite_rounded
                                   : Icons.favorite_border_rounded,
-                              color: _isFavorite
+                              color: isFavorite
                                   ? const Color(0xFFB94D50)
                                   : _ink,
                               size: 20,
@@ -544,144 +597,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
     );
   }
 
-  Widget _buildSizeSelector() {
-    return Container(
-      padding: const EdgeInsets.all(17),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'SELECT YOUR SIZE',
-                  style: TextStyle(
-                    color: _ink,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () => _showSizeGuide(),
-                style: TextButton.styleFrom(
-                  foregroundColor: _gold,
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 25),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  'Size guide',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: List.generate(sizes.length, (index) {
-              final selected = selectedSize == index;
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(right: index == sizes.length - 1 ? 0 : 9),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    decoration: BoxDecoration(
-                      color: selected ? _ink : _cream,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: selected ? _ink : _line),
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => setState(() => selectedSize = index),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          child: Center(
-                            child: Text(
-                              sizes[index],
-                              style: TextStyle(
-                                color: selected ? Colors.white : _ink,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showSizeGuide() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: _cream,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-      ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(22, 16, 22, 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: _line,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 22),
-              const Text(
-                'Size guide',
-                style: TextStyle(
-                  color: _ink,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Select the size that usually fits you best. For exact measurements, please check the product label or contact the store.',
-                style: TextStyle(color: _muted, fontSize: 13, height: 1.5),
-              ),
-              const SizedBox(height: 18),
-              const Text(
-                'Available sizes:  S   M   L   XL',
-                style: TextStyle(
-                  color: _ink,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildDetailsNote() {
     return const Padding(
       padding: EdgeInsets.symmetric(horizontal: 4),
@@ -704,7 +619,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
                 ),
                 SizedBox(height: 5),
                 Text(
-                  'Explore the images up close, then choose your size and continue when you are ready.',
+                  'Explore the images up close, then contact us on WhatsApp to enquire or book.',
                   style: TextStyle(color: _muted, fontSize: 12, height: 1.55),
                 ),
               ],
@@ -732,71 +647,43 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _showActionMessage('Schedule trial'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _ink,
-                    side: const BorderSide(color: _line, width: 1.2),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
+          child: SizedBox(
+            width: double.infinity,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [_gold, Color(0xFF9E713F)],
+                ),
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: [
+                  BoxShadow(
+                    color: _gold.withOpacity(0.24),
+                    blurRadius: 13,
+                    offset: const Offset(0, 5),
                   ),
-                  child: const Text(
-                    'Schedule Trial',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                ],
+              ),
+              child: ElevatedButton.icon(
+                onPressed: _openWhatsApp,
+                icon: const Icon(Icons.chat_rounded, size: 18),
+                label: const Text(
+                  'Book Now on WhatsApp',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              ),
-              const SizedBox(width: 11),
-              Expanded(
-                flex: 1,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [_gold, Color(0xFF9E713F)],
-                    ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  shadowColor: Colors.transparent,
+                  padding: const EdgeInsets.symmetric(vertical: 17),
+                  shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _gold.withOpacity(0.24),
-                        blurRadius: 13,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: ElevatedButton(
-                    onPressed: () => _showActionMessage('Booking'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      foregroundColor: Colors.white,
-                      shadowColor: Colors.transparent,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Book Now',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        SizedBox(width: 6),
-                        Icon(Icons.arrow_forward_rounded, size: 16),
-                      ],
-                    ),
                   ),
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),
