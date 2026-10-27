@@ -768,7 +768,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen>
           ),
           const SizedBox(height: 17),
           SizedBox(
-            height: 280,
+            height: 340,
             child: FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
               future: FirebaseFirestore.instance
                   .collection('products')

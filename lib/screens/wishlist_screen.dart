@@ -37,13 +37,12 @@ class WishlistScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 20),
               itemCount: items.length,
 
-              gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 16,
-                childAspectRatio: 0.60,
-              ),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+  crossAxisCount: 2,
+  crossAxisSpacing: 12,
+  mainAxisSpacing: 16,
+  childAspectRatio: 0.48, // Was 0.60
+),
 
               itemBuilder: (context, index) {
                 final product = items[index];

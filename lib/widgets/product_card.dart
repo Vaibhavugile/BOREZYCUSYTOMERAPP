@@ -121,7 +121,7 @@ class ProductCard extends StatelessWidget {
                 ),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 11, 12, 12),
+                   padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -270,7 +270,7 @@ class _ProductImageState extends State<_ProductImage>
   @override
   Widget build(BuildContext context) {
     return AspectRatio(
-      aspectRatio: 0.79,
+      aspectRatio: 0.95,
       child: Stack(
         fit: StackFit.expand,
         children: [
