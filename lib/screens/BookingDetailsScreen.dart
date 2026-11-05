@@ -31,6 +31,23 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen>
   late final AnimationController _introController;
   late Future<QuerySnapshot<Map<String, dynamic>>> _historyFuture;
 
+  static const String _pickupTermsVersion = 'pickup-terms-v1';
+  bool _pickupTermsAccepted = false;
+  bool _pickupTermsLoading = false;
+  bool _pickupTermsSaving = false;
+  bool _pickupTermsPromptHandled = false;
+  bool _pickupTermsChecked = false;
+
+  static const List<String> _pickupTerms = [
+    'Please check all rented items carefully at the time of pickup and report any existing damage, stains, missing parts, or other issues to our team before leaving.',
+    'Once the items are handed over, you are responsible for keeping them safe and in good condition until they are returned.',
+    'Use the rented items only for their intended purpose. Do not alter, repair, wash, dry-clean, or make any permanent changes unless our team has approved it.',
+    'Return all items and accessories by the agreed return date and time shown in your booking. Late returns may attract additional charges as per the applicable booking policy.',
+    'If an item is lost, damaged, stained, or returned with missing accessories, applicable repair, replacement, or other charges may be adjusted against the deposit or collected separately, in accordance with the booking policy.',
+    'Please contact our support team promptly if you notice any issue during the rental period. Keep your booking receipt available when contacting us.',
+    'By accepting these terms, you confirm that you have read and understood the pickup and care responsibilities for this booking.',
+  ];
+
   Map<String, dynamic> get booking => widget.booking;
   String get receipt => (booking['receiptNumber'] ?? 'Booking').toString();
   String get stage => (booking['bookingStage'] ?? 'Booking').toString();
@@ -44,7 +61,9 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen>
     );
     _historyFuture = _fetchPaymentHistory();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _introController.forward();
+      if (!mounted) return;
+      _introController.forward();
+      _loadPickupTermsAcceptance();
     });
   }
 
@@ -52,6 +71,310 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen>
   void dispose() {
     _introController.dispose();
     super.dispose();
+  }
+
+  DocumentReference<Map<String, dynamic>> get _paymentDocument =>
+      FirebaseFirestore.instance
+          .collection('products')
+          .doc(TenantConfig.branchCode)
+          .collection('payments')
+          .doc(receipt);
+
+  Future<void> _loadPickupTermsAcceptance() async {
+    if (stage != 'pickupPending' || _pickupTermsLoading) return;
+    setState(() => _pickupTermsLoading = true);
+    try {
+      final snapshot = await _paymentDocument.get();
+      final acceptance = snapshot.data()?['pickupTermsAcceptance'];
+      final accepted = acceptance is Map && acceptance['accepted'] == true;
+      if (!mounted) return;
+      setState(() {
+        _pickupTermsAccepted = accepted;
+        _pickupTermsLoading = false;
+      });
+      if (!accepted && !_pickupTermsPromptHandled) {
+        _pickupTermsPromptHandled = true;
+        await _showPickupTermsDialog();
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _pickupTermsLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not verify pickup terms. Please refresh and try again.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showPickupTermsDialog() async {
+    if (!mounted || stage != 'pickupPending' || _pickupTermsAccepted) return;
+    _pickupTermsChecked = false;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              titlePadding: const EdgeInsets.fromLTRB(22, 22, 22, 8),
+              contentPadding: const EdgeInsets.fromLTRB(22, 8, 22, 12),
+              actionsPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+              title: const Row(
+                children: [
+                  Icon(Icons.fact_check_outlined, color: _gold, size: 25),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Pickup Terms & Conditions',
+                      style: TextStyle(
+                        color: _ink,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 520,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Booking $receipt',
+                        style: const TextStyle(
+                          color: _muted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      ..._pickupTerms.asMap().entries.map((entry) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 13),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 23,
+                                height: 23,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: _softGold,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '${entry.key + 1}',
+                                  style: const TextStyle(
+                                    color: _gold,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  entry.value,
+                                  style: const TextStyle(
+                                    color: _ink,
+                                    fontSize: 12,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                      const Divider(color: _line, height: 22),
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        activeColor: _gold,
+                        value: _pickupTermsChecked,
+                        onChanged: _pickupTermsSaving
+                            ? null
+                            : (value) => setDialogState(
+                                  () => _pickupTermsChecked = value ?? false,
+                                ),
+                        title: const Text(
+                          'I have read, understood and agree to the Pickup Terms & Conditions.',
+                          style: TextStyle(
+                            color: _ink,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: (!_pickupTermsChecked || _pickupTermsSaving)
+                        ? null
+                        : () async {
+                            setDialogState(() {});
+                            await _savePickupTermsAcceptance(dialogContext);
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _ink,
+                      disabledBackgroundColor: const Color(0xFFD8D1C9),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: _pickupTermsSaving
+                        ? const SizedBox(
+                            width: 19,
+                            height: 19,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Accept & Continue',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _savePickupTermsAcceptance(BuildContext dialogContext) async {
+    if (!_pickupTermsChecked || _pickupTermsSaving) return;
+    setState(() => _pickupTermsSaving = true);
+    try {
+      await _paymentDocument.set({
+        'pickupTermsAcceptance': {
+          'accepted': true,
+          'acceptedAt': FieldValue.serverTimestamp(),
+          'termsVersion': _pickupTermsVersion,
+          'customerName': (booking['clientName'] ?? '').toString(),
+          'customerPhone': (booking['contact'] ?? '').toString(),
+          'receiptNumber': receipt,
+        },
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+      setState(() {
+        _pickupTermsAccepted = true;
+        _pickupTermsSaving = false;
+      });
+      if (Navigator.of(dialogContext).canPop()) {
+        Navigator.of(dialogContext).pop();
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pickup terms accepted successfully.'),
+          backgroundColor: _green,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _pickupTermsSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save your acceptance. Please try again.'),
+          backgroundColor: _red,
+        ),
+      );
+    }
+  }
+
+  Widget _pickupTermsCard() {
+    if (stage != 'pickupPending') return const SizedBox.shrink();
+    if (_pickupTermsLoading) {
+      return _sectionCard(
+        title: 'Pickup confirmation',
+        subtitle: 'Checking your acceptance status',
+        icon: Icons.fact_check_outlined,
+        child: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(12),
+            child: CircularProgressIndicator(color: _gold),
+          ),
+        ),
+      );
+    }
+    if (_pickupTermsAccepted) {
+      return _sectionCard(
+        title: 'Pickup terms accepted',
+        subtitle: 'Your confirmation has been saved',
+        icon: Icons.verified_rounded,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEFF7F1),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: _green.withOpacity(0.25)),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: _green),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'You have accepted the pickup terms for this booking. Our team can verify this confirmation.',
+                  style: TextStyle(color: _ink, fontSize: 12, height: 1.45),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return _sectionCard(
+      title: 'Pickup confirmation required',
+      subtitle: 'Accept the terms before pickup',
+      icon: Icons.fact_check_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Please review and accept the Pickup Terms & Conditions to confirm that you understand the item-care and return responsibilities.',
+            style: TextStyle(color: _muted, fontSize: 12, height: 1.5),
+          ),
+          const SizedBox(height: 13),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _showPickupTermsDialog,
+              icon: const Icon(Icons.description_outlined),
+              label: const Text('Review & accept terms'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _gold,
+                side: const BorderSide(color: _gold),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(13),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<QuerySnapshot<Map<String, dynamic>>> _fetchPaymentHistory() {
@@ -291,24 +614,28 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen>
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
           children: [
             _animated(0, _receiptHeader(pickup, returnDate)),
-            const SizedBox(height: 16),
-            _animated(1, _customerCard()),
-            const SizedBox(height: 16),
-            _animated(2, _productSection(_products())),
-            const SizedBox(height: 16),
-            _animated(3, _paymentDetails(booking)),
-            const SizedBox(height: 16),
-            _animated(4, _paymentHistory()),
-            const SizedBox(height: 16),
-            _animated(5, _accountSummary(booking)),
-            if (_value(booking['specialNote']) != '—') ...[
+            if (stage == 'pickupPending') ...[
               const SizedBox(height: 16),
-              _animated(6, _noteSection()),
+              _animated(1, _pickupTermsCard()),
             ],
             const SizedBox(height: 16),
-            _animated(7, _attachmentsSection()),
+            _animated(2, _customerCard()),
             const SizedBox(height: 16),
-            _animated(8, _helpSection()),
+            _animated(3, _productSection(_products())),
+            const SizedBox(height: 16),
+            _animated(4, _paymentDetails(booking)),
+            const SizedBox(height: 16),
+            _animated(5, _paymentHistory()),
+            const SizedBox(height: 16),
+            _animated(6, _accountSummary(booking)),
+            if (_value(booking['specialNote']) != '—') ...[
+              const SizedBox(height: 16),
+              _animated(7, _noteSection()),
+            ],
+            const SizedBox(height: 16),
+            _animated(8, _attachmentsSection()),
+            const SizedBox(height: 16),
+            _animated(9, _helpSection()),
             const SizedBox(height: 14),
           ],
         ),
