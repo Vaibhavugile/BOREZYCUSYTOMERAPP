@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../services/user_helper.dart';
+import '../services/review_notification_navigation.dart';
+import '../services/fcm_service.dart';
 import 'booking_list_screen.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 import 'partner_dashboard_screen.dart';
 import 'profile_screen.dart';
+import 'reviews_screen.dart';
 import 'store_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -19,6 +22,8 @@ class _MainScreenState extends State<MainScreen> {
   int selectedIndex = 0;
   bool isGuest = true;
   bool isCheckingUser = true;
+  ReviewNotificationIntent? _reviewIntent;
+  bool _fcmSetupStarted = false;
 
   static const Color _background = Color(0xFFFAF8F5);
   static const Color _ink = Color(0xFF29221F);
@@ -27,18 +32,48 @@ class _MainScreenState extends State<MainScreen> {
   static const Color _line = Color(0xFFECE5DC);
   static const Color _selectedBackground = Color(0xFFF7F0E7);
 
-  final List<Widget> _pages = const [
-    HomeScreen(),
-    StorePage(),
-    BookingListScreen(),
-    PartnerDashboardScreen(),
-    ProfileScreen(),
-  ];
+  List<Widget> get _pages => [
+        const HomeScreen(),
+        const StorePage(),
+        const BookingListScreen(),
+        const PartnerDashboardScreen(),
+        const ProfileScreen(),
+        ReviewsScreen(
+          key: ValueKey(_reviewIntent?.identity ?? 'reviews-default'),
+          initialBranchCode: _reviewIntent?.branchCode,
+          initialPaymentId: _reviewIntent?.paymentId,
+          initialReceiptNumber: _reviewIntent?.receiptNumber,
+        ),
+      ];
 
   @override
   void initState() {
     super.initState();
+    _reviewIntent = ReviewNotificationNavigation.pending.value;
+    ReviewNotificationNavigation.pending.addListener(_onReviewNotification);
     _checkGuest();
+
+    if (_reviewIntent != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => selectedIndex = 5);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    ReviewNotificationNavigation.pending.removeListener(_onReviewNotification);
+    super.dispose();
+  }
+
+  void _onReviewNotification() {
+    final intent = ReviewNotificationNavigation.pending.value;
+    if (intent == null || !mounted) return;
+
+    setState(() {
+      _reviewIntent = intent;
+      selectedIndex = 5;
+    });
   }
 
   Future<void> _checkGuest() async {
@@ -51,6 +86,18 @@ class _MainScreenState extends State<MainScreen> {
         isGuest = phone == null || phone.trim().isEmpty;
         isCheckingUser = false;
       });
+
+      // Register the signed-in customer's FCM token using the existing
+      // diagnostic FCMService. This is intentionally not called for guests.
+      if (!isGuest) {
+        _setupCustomerFcm();
+      }
+
+      // A notification can arrive while StartupScreen is being shown. If the
+      // user is signed in, the pending intent is consumed by this screen.
+      if (!isGuest && ReviewNotificationNavigation.pending.value != null) {
+        _onReviewNotification();
+      }
     } catch (error) {
       debugPrint('Could not check saved user phone: $error');
 
@@ -63,18 +110,33 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  Future<void> _onItemTapped(int index) async {
-    if (index < 0 || index >= _pages.length) return;
+  Future<void> _setupCustomerFcm() async {
+    if (_fcmSetupStarted) return;
+    _fcmSetupStarted = true;
 
-    // Rentals, Partner and Profile require a signed-in user.
-    if (isGuest && (index == 2 || index == 3 || index == 4)) {
+    // FCMService.setupFCM() already:
+    // - requests notification permission,
+    // - waits for the iOS APNs token before requesting the FCM token,
+    // - saves the token at customers/{branch}/users/{phone},
+    // - updates it when the token refreshes,
+    // - subscribes to branch_{branch},
+    // - records diagnostic messages for the OTP screen.
+    //
+    // Its internal try/catch keeps notification setup failures from
+    // interrupting the customer's signed-in app experience.
+    await FCMService.setupFCM();
+  }
+
+  Future<void> _onItemTapped(int index) async {
+    if (index < 0 || index >= 6) return;
+
+    if (isGuest && (index == 2 || index == 3 || index == 4 || index == 5)) {
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => const LoginScreen(),
         ),
       );
 
-      // Refresh saved login state when the login screen closes.
       if (mounted) {
         await _checkGuest();
       }
@@ -90,6 +152,18 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (isCheckingUser) {
+      return const Scaffold(
+        backgroundColor: _background,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: _gold,
+            strokeWidth: 2.5,
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: _background,
       extendBody: true,
@@ -104,10 +178,7 @@ class _MainScreenState extends State<MainScreen> {
           builder: (context, constraints) {
             return Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 4,
-                vertical: 6,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(25),
@@ -153,6 +224,13 @@ class _MainScreenState extends State<MainScreen> {
                     activeIcon: Icons.person_rounded,
                     label: 'Profile',
                   ),
+                  _buildNavItem(
+                    index: 5,
+                    icon: Icons.rate_review_outlined,
+                    activeIcon: Icons.rate_review_rounded,
+                    label: 'Reviews',
+                    showLock: isGuest,
+                  ),
                 ],
               ),
             );
@@ -185,10 +263,7 @@ class _MainScreenState extends State<MainScreen> {
               duration: const Duration(milliseconds: 240),
               curve: Curves.easeOutCubic,
               margin: const EdgeInsets.symmetric(horizontal: 1),
-              padding: const EdgeInsets.symmetric(
-                vertical: 6,
-                horizontal: 1,
-              ),
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 1),
               decoration: BoxDecoration(
                 color: isSelected ? _selectedBackground : Colors.transparent,
                 borderRadius: BorderRadius.circular(18),
@@ -196,8 +271,6 @@ class _MainScreenState extends State<MainScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Use a non-overshooting curve and non-negative width so
-                  // fractional pixel rounding cannot produce negative width.
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 220),
                     curve: Curves.easeOutCubic,

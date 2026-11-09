@@ -31,26 +31,79 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen>
   late final AnimationController _introController;
   late Future<QuerySnapshot<Map<String, dynamic>>> _historyFuture;
 
-  static const String _pickupTermsVersion = 'pickup-terms-v1';
-  bool _pickupTermsAccepted = false;
-  bool _pickupTermsLoading = false;
-  bool _pickupTermsSaving = false;
-  bool _pickupTermsPromptHandled = false;
-  bool _pickupTermsChecked = false;
+  static const String _dorTermsVersion = 'dor-rental-terms-v1';
+  bool _termsAccepted = false;
+  bool _termsLoading = false;
+  bool _termsSaving = false;
+  bool _termsPromptHandled = false;
+  bool _termsChecked = false;
 
-  static const List<String> _pickupTerms = [
-    'Please check all rented items carefully at the time of pickup and report any existing damage, stains, missing parts, or other issues to our team before leaving.',
-    'Once the items are handed over, you are responsible for keeping them safe and in good condition until they are returned.',
-    'Use the rented items only for their intended purpose. Do not alter, repair, wash, dry-clean, or make any permanent changes unless our team has approved it.',
-    'Return all items and accessories by the agreed return date and time shown in your booking. Late returns may attract additional charges as per the applicable booking policy.',
-    'If an item is lost, damaged, stained, or returned with missing accessories, applicable repair, replacement, or other charges may be adjusted against the deposit or collected separately, in accordance with the booking policy.',
-    'Please contact our support team promptly if you notice any issue during the rental period. Keep your booking receipt available when contacting us.',
-    'By accepting these terms, you confirm that you have read and understood the pickup and care responsibilities for this booking.',
+  static const List<_TermsSection> _dorTerms = [
+    _TermsSection(
+      title: 'Before leaving the billing counter',
+      body: 'Thank you for choosing DOR. Please check the product details and alterations on your receipt before leaving the billing counter. We can assist with corrections on the spot, but cannot take responsibility for issues reported afterward.',
+    ),
+    _TermsSection(
+      title: 'Minimum renting period – 3 days (53 hours)',
+      body: 'Day 1: Pick up the dress after 3 PM.\nDay 2: Flaunt the dress.\nDay 3: Return the dress before 8 PM.\n\nAfter 8 PM or the time mentioned on your receipt, it will be counted as the next day. 50% of the rent amount will be charged per day and deducted from your security deposit.',
+    ),
+    _TermsSection(
+      title: 'Cancellation policy',
+      body: 'Rent amount will not be refunded under any circumstances.',
+    ),
+    _TermsSection(
+      title: 'Exchange / event date postpone',
+      body: 'Subject to availability and chargeable. Minimum charge: 50% of the rent amount.',
+    ),
+    _TermsSection(
+      title: 'Security deposit',
+      body: 'Refunded within 2–7 working days after return of your outfit via online transfer. Please do not request the deposit refund at the time of drop; it is part of our process.',
+    ),
+    _TermsSection(
+      title: 'Online booking',
+      body: 'For online bookings, DOR will not be responsible for size, fitting, outfit condition, etc. No refund will be provided in such cases.',
+    ),
+    _TermsSection(
+      title: 'Damage policy',
+      body: 'Minor damage charges will be deducted from the security deposit depending on the condition. Rent is calculated as 10–15% of making cost. In case of loss or complete damage, the customer must pay the full making cost. If the customer fails to pay, DOR Dress On Rent reserves the right to take legal action.',
+    ),
+    _TermsSection(
+      title: 'Dry cleaning',
+      body: 'Dry cleaning before pickup and after return is handled by DOR. If the outfit is too dirty, heavily soiled, or has permanent stains, dry-cleaning charges as per market rate will be deducted from the security deposit.',
+    ),
+    _TermsSection(
+      title: 'Outfit condition',
+      body: 'We take utmost care of our outfits, but as a rental agency, permanent stains or minor damages may occur due to multiple uses. We ensure the outfit looks good for your event and request customers to cooperate with us.',
+    ),
+    _TermsSection(
+      title: 'Booking cancellation by DOR',
+      body: 'DOR has the right to cancel the booking on the day of pickup or before, in case of any issues. In such cases, the complete paid amount will be refunded.',
+    ),
+    _TermsSection(
+      title: 'Alterations',
+      body: 'Please take trials at the time of pickup. If trials are not taken and the dress is picked up, DOR Dress On Rent will not be responsible for alterations mentioned in the receipt.',
+    ),
+    _TermsSection(
+      title: 'Tips while using the dress',
+      body: '1. Do not use colour bombs or smoke bombs – they may cause fire hazards.\n2. Do not wear during Haldi/Gulal or after applying Haldi – it can completely damage the outfit.\n3. Be cautious of grease stains, tobacco stains, cigarette burns, etc.\n4. For gowns/lehenga, always hold the gown up while walking to avoid damage.\n5. Beach photos are beautiful, but mud can harm outfits. Rinse in fresh water immediately after use.\n6. Do not alter the dress yourself.',
+    ),
   ];
+
+  String get _alterations {
+    final userDetails = booking['userDetails'];
+    if (userDetails is Map) {
+      final nested = userDetails['alterations'];
+      if (nested != null && nested.toString().trim().isNotEmpty) {
+        return nested.toString().trim();
+      }
+    }
+    final direct = booking['alterations'];
+    return direct == null ? '' : direct.toString().trim();
+  }
 
   Map<String, dynamic> get booking => widget.booking;
   String get receipt => (booking['receiptNumber'] ?? 'Booking').toString();
-  String get stage => (booking['bookingStage'] ?? 'Booking').toString();
+  String get stage => (booking['stage'] ?? booking['bookingStage'] ?? 'Booking').toString();
 
   @override
   void initState() {
@@ -63,7 +116,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _introController.forward();
-      _loadPickupTermsAcceptance();
+      _loadDorTermsAcceptance();
     });
   }
 
@@ -80,180 +133,302 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen>
           .collection('payments')
           .doc(receipt);
 
-  Future<void> _loadPickupTermsAcceptance() async {
-    if (stage != 'pickupPending' || _pickupTermsLoading) return;
-    setState(() => _pickupTermsLoading = true);
+  Future<void> _loadDorTermsAcceptance() async {
+    if (_termsLoading) return;
+    final reference = _paymentDocument;
+
+    setState(() => _termsLoading = true);
     try {
-      final snapshot = await _paymentDocument.get();
-      final acceptance = snapshot.data()?['pickupTermsAcceptance'];
+      final snapshot = await reference.get();
+      final acceptance = snapshot.data()?['dorTermsAcceptance'];
       final accepted = acceptance is Map && acceptance['accepted'] == true;
+
       if (!mounted) return;
       setState(() {
-        _pickupTermsAccepted = accepted;
-        _pickupTermsLoading = false;
+        _termsAccepted = accepted;
+        _termsLoading = false;
       });
-      if (!accepted && !_pickupTermsPromptHandled) {
-        _pickupTermsPromptHandled = true;
-        await _showPickupTermsDialog();
+
+      if (!accepted && !_termsPromptHandled) {
+        _termsPromptHandled = true;
+        await _showDorTermsDialog();
       }
     } catch (_) {
       if (!mounted) return;
-      setState(() => _pickupTermsLoading = false);
+      setState(() => _termsLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Could not verify pickup terms. Please refresh and try again.'),
+          content: Text('Could not verify the booking terms. Please refresh and try again.'),
         ),
       );
     }
   }
 
-  Future<void> _showPickupTermsDialog() async {
-    if (!mounted || stage != 'pickupPending' || _pickupTermsAccepted) return;
-    _pickupTermsChecked = false;
+  Future<void> _showDorTermsDialog() async {
+    if (!mounted || _termsAccepted || _termsSaving) return;
+    _termsChecked = false;
+
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: Colors.white,
-              surfaceTintColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              titlePadding: const EdgeInsets.fromLTRB(22, 22, 22, 8),
-              contentPadding: const EdgeInsets.fromLTRB(22, 8, 22, 12),
-              actionsPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-              title: const Row(
-                children: [
-                  Icon(Icons.fact_check_outlined, color: _gold, size: 25),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Pickup Terms & Conditions',
-                      style: TextStyle(
-                        color: _ink,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
+            return PopScope(
+              canPop: false,
+              child: Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 560, maxHeight: 760),
+                decoration: BoxDecoration(
+                  color: _cream,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: _gold.withOpacity(0.35)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _ink.withOpacity(0.22),
+                      blurRadius: 35,
+                      offset: const Offset(0, 16),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(22, 22, 18, 18),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF342A24), Color(0xFF211B18)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                              color: _gold.withOpacity(0.20),
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            child: const Icon(Icons.verified_user_outlined, color: Color(0xFFE0BD8D)),
+                          ),
+                          const SizedBox(width: 13),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'DOR DRESS ON RENT',
+                                  style: TextStyle(
+                                    color: Color(0xFFE0BD8D),
+                                    fontSize: 9,
+                                    letterSpacing: 2,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                                SizedBox(height: 5),
+                                Text(
+                                  'Terms & Conditions',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.10),
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            child: Text(
+                              receipt,
+                              style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
-              ),
-              content: SizedBox(
-                width: 520,
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Booking $receipt',
-                        style: const TextStyle(
-                          color: _muted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      ..._pickupTerms.asMap().entries.map((entry) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 13),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 23,
-                                height: 23,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: _softGold,
-                                  borderRadius: BorderRadius.circular(8),
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+                        children: [
+                          const Text(
+                            'By taking our service, you AGREE to all the Terms & Conditions mentioned below. If you fail to follow them, DOR Dress On Rent reserves the right to take legal action.',
+                            style: TextStyle(color: _ink, fontSize: 13, height: 1.5, fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 15),
+                          ..._dorTerms.asMap().entries.map((entry) {
+                            final section = entry.value;
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(17),
+                                border: Border.all(color: _line),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        width: 25,
+                                        height: 25,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: _softGold,
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          '${entry.key + 1}',
+                                          style: const TextStyle(color: _gold, fontSize: 11, fontWeight: FontWeight.w900),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          section.title,
+                                          style: const TextStyle(color: _ink, fontSize: 12, fontWeight: FontWeight.w900),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 9),
+                                  Text(
+                                    section.body,
+                                    style: const TextStyle(color: _muted, fontSize: 11, height: 1.6),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: _softGold,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: _gold.withOpacity(0.25)),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.support_agent_rounded, color: _gold, size: 20),
+                                SizedBox(width: 9),
+                                Expanded(
+                                  child: Text(
+                                    'Thanks & Regards\nDOR – Dress On Rent\n8698797007',
+                                    style: TextStyle(color: _ink, fontSize: 11, height: 1.5, fontWeight: FontWeight.w800),
+                                  ),
                                 ),
-                                child: Text(
-                                  '${entry.key + 1}',
-                                  style: const TextStyle(
-                                    color: _gold,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w900,
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+                        border: Border(top: BorderSide(color: _line)),
+                      ),
+                      child: Column(
+                        children: [
+                          CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            controlAffinity: ListTileControlAffinity.leading,
+                            activeColor: _gold,
+                            value: _termsChecked,
+                            onChanged: _termsSaving
+                                ? null
+                                : (value) => setDialogState(() => _termsChecked = value ?? false),
+                            title: const Text(
+                              'I have read, understood and agree to all DOR Terms & Conditions for this booking.',
+                              style: TextStyle(color: _ink, fontSize: 11, height: 1.4, fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: SizedBox(
+                                  height: 49,
+                                  child: OutlinedButton(
+                                    onPressed: _termsSaving
+                                        ? null
+                                        : () => Navigator.of(dialogContext).pop(),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: _ink,
+                                      side: const BorderSide(color: _line),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Cancel',
+                                      style: TextStyle(fontWeight: FontWeight.w800),
+                                    ),
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
-                                child: Text(
-                                  entry.value,
-                                  style: const TextStyle(
-                                    color: _ink,
-                                    fontSize: 12,
-                                    height: 1.5,
+                                flex: 3,
+                                child: SizedBox(
+                                  height: 49,
+                                  child: ElevatedButton(
+                                    onPressed: (!_termsChecked || _termsSaving)
+                                        ? null
+                                        : () async {
+                                            setDialogState(() {});
+                                            await _saveDorTermsAcceptance(dialogContext);
+                                            if (mounted) setDialogState(() {});
+                                          },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: _ink,
+                                      disabledBackgroundColor: const Color(0xFFD8D1C9),
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                    child: _termsSaving
+                                        ? const SizedBox(
+                                            width: 19,
+                                            height: 19,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : const Text(
+                                            'Accept & Continue',
+                                            style: TextStyle(fontWeight: FontWeight.w900),
+                                          ),
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                        );
-                      }),
-                      const Divider(color: _line, height: 22),
-                      CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        controlAffinity: ListTileControlAffinity.leading,
-                        activeColor: _gold,
-                        value: _pickupTermsChecked,
-                        onChanged: _pickupTermsSaving
-                            ? null
-                            : (value) => setDialogState(
-                                  () => _pickupTermsChecked = value ?? false,
-                                ),
-                        title: const Text(
-                          'I have read, understood and agree to the Pickup Terms & Conditions.',
-                          style: TextStyle(
-                            color: _ink,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: (!_pickupTermsChecked || _pickupTermsSaving)
-                        ? null
-                        : () async {
-                            setDialogState(() {});
-                            await _savePickupTermsAcceptance(dialogContext);
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _ink,
-                      disabledBackgroundColor: const Color(0xFFD8D1C9),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        ],
                       ),
                     ),
-                    child: _pickupTermsSaving
-                        ? const SizedBox(
-                            width: 19,
-                            height: 19,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text(
-                            'Accept & Continue',
-                            style: TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
+              ),
             );
           },
         );
@@ -261,53 +436,61 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen>
     );
   }
 
-  Future<void> _savePickupTermsAcceptance(BuildContext dialogContext) async {
-    if (!_pickupTermsChecked || _pickupTermsSaving) return;
-    setState(() => _pickupTermsSaving = true);
+  Future<void> _saveDorTermsAcceptance(BuildContext dialogContext) async {
+    if (!_termsChecked || _termsSaving) return;
+    final reference = _paymentDocument;
+
+    setState(() => _termsSaving = true);
     try {
-      await _paymentDocument.set({
-        'pickupTermsAcceptance': {
+      await reference.set({
+        'dorTermsAcceptance': {
           'accepted': true,
           'acceptedAt': FieldValue.serverTimestamp(),
-          'termsVersion': _pickupTermsVersion,
-          'customerName': (booking['clientName'] ?? '').toString(),
-          'customerPhone': (booking['contact'] ?? '').toString(),
+          'termsVersion': _dorTermsVersion,
+          'customerName': _customerName,
+          'customerPhone': _customerPhone,
           'receiptNumber': receipt,
+          'bookingId': booking['bookingId'],
         },
       }, SetOptions(merge: true));
 
       if (!mounted) return;
       setState(() {
-        _pickupTermsAccepted = true;
-        _pickupTermsSaving = false;
+        _termsAccepted = true;
+        _termsSaving = false;
       });
       if (Navigator.of(dialogContext).canPop()) {
         Navigator.of(dialogContext).pop();
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pickup terms accepted successfully.'),
-          backgroundColor: _green,
-        ),
+        const SnackBar(content: Text('DOR Terms & Conditions accepted and saved.'), backgroundColor: _green),
       );
     } catch (_) {
       if (!mounted) return;
-      setState(() => _pickupTermsSaving = false);
+      setState(() => _termsSaving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not save your acceptance. Please try again.'),
-          backgroundColor: _red,
-        ),
+        const SnackBar(content: Text('Could not save your acceptance. Please try again.'), backgroundColor: _red),
       );
     }
   }
 
-  Widget _pickupTermsCard() {
-    if (stage != 'pickupPending') return const SizedBox.shrink();
-    if (_pickupTermsLoading) {
+  String get _customerName {
+    final details = booking['userDetails'];
+    if (details is Map && details['name'] != null) return details['name'].toString();
+    return (booking['clientName'] ?? booking['name'] ?? '').toString();
+  }
+
+  String get _customerPhone {
+    final details = booking['userDetails'];
+    if (details is Map && details['contact'] != null) return details['contact'].toString();
+    return (booking['contact'] ?? '').toString();
+  }
+
+  Widget _dorTermsCard() {
+    if (_termsLoading) {
       return _sectionCard(
-        title: 'Pickup confirmation',
-        subtitle: 'Checking your acceptance status',
+        title: 'DOR Terms & Conditions',
+        subtitle: 'Checking your booking acceptance',
         icon: Icons.fact_check_outlined,
         child: const Center(
           child: Padding(
@@ -317,10 +500,10 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen>
         ),
       );
     }
-    if (_pickupTermsAccepted) {
+    if (_termsAccepted) {
       return _sectionCard(
-        title: 'Pickup terms accepted',
-        subtitle: 'Your confirmation has been saved',
+        title: 'Terms accepted',
+        subtitle: 'Your confirmation is saved for this booking',
         icon: Icons.verified_rounded,
         child: Container(
           padding: const EdgeInsets.all(14),
@@ -335,7 +518,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen>
               SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'You have accepted the pickup terms for this booking. Our team can verify this confirmation.',
+                  'You have accepted the DOR Terms & Conditions for this booking.',
                   style: TextStyle(color: _ink, fontSize: 12, height: 1.45),
                 ),
               ),
@@ -345,30 +528,28 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen>
       );
     }
     return _sectionCard(
-      title: 'Pickup confirmation required',
-      subtitle: 'Accept the terms before pickup',
+      title: 'Terms acceptance required',
+      subtitle: 'Please accept before continuing',
       icon: Icons.fact_check_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Please review and accept the Pickup Terms & Conditions to confirm that you understand the item-care and return responsibilities.',
+            'Review the DOR rental terms and conditions for this booking. Acceptance is required and will be saved against this booking.',
             style: TextStyle(color: _muted, fontSize: 12, height: 1.5),
           ),
           const SizedBox(height: 13),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: _showPickupTermsDialog,
+              onPressed: _showDorTermsDialog,
               icon: const Icon(Icons.description_outlined),
               label: const Text('Review & accept terms'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: _gold,
                 side: const BorderSide(color: _gold),
                 padding: const EdgeInsets.symmetric(vertical: 13),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(13),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
               ),
             ),
           ),
@@ -614,9 +795,9 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen>
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
           children: [
             _animated(0, _receiptHeader(pickup, returnDate)),
-            if (stage == 'pickupPending') ...[
+            ...[
               const SizedBox(height: 16),
-              _animated(1, _pickupTermsCard()),
+              _animated(1, _dorTermsCard()),
             ],
             const SizedBox(height: 16),
             _animated(2, _customerCard()),
@@ -862,8 +1043,8 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen>
           _infoRow('Contact number', booking['contact'], icon: Icons.phone_iphone_rounded),
           _infoRow('Customer by', booking['customerBy'], icon: Icons.person_search_rounded),
           _infoRow('Receipt by', booking['receiptBy'], icon: Icons.receipt_outlined),
-          if (_value(booking['alterations']) != '—')
-            _infoRow('Alterations', booking['alterations'], icon: Icons.content_cut_rounded),
+          if (_alterations.isNotEmpty)
+            _infoRow('Alterations', _alterations, icon: Icons.content_cut_rounded),
           if (booking['createdAt'] != null)
             _infoRow(
               'Created on',
@@ -1708,4 +1889,12 @@ class _ActionButton extends StatelessWidget {
       ),
     );
   }
+}
+
+
+class _TermsSection {
+  final String title;
+  final String body;
+
+  const _TermsSection({required this.title, required this.body});
 }

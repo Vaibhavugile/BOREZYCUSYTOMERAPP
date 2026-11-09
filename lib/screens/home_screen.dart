@@ -955,7 +955,7 @@ Widget _dorExperienceSection() {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      "Wear the moment.\\nKeep the memories.",
+                      "Wear the moment.Keep the memories.",
                       style: TextStyle(
                         color: Color(0xFF29221F),
                         fontSize: 22,
